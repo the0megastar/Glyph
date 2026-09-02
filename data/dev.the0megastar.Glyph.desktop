@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Glyph
+Comment=Find applications and change or restore their icons
+Exec=glyph
+Icon=dev.the0megastar.Glyph
+Terminal=false
+Type=Application
+Categories=Settings;DesktopSettings;
+Keywords=icon;desktop;launcher;theme;
+StartupNotify=true
+DBusActivatable=false

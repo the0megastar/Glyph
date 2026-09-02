@@ -1,0 +1,6 @@
+/build/
+/builddir/
+*.pyc
+__pycache__/
+/.mesonpy
+*.egg-info/
