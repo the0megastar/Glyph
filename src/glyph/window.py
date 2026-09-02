@@ -5,11 +5,6 @@ from gi.repository import Adw, Gio, GLib, Gtk, Pango
 from glyph.catalog import AppEntry, list_apps
 from glyph.overrides import OverrideError, apply_icon, load_state, revert_icon
 
-REFRESH_NOTE = (
-    "The app grid usually updates right away. Pinned dash icons may need "
-    "unpin and pin, or a logout, before they change."
-)
-
 
 def _image_from_gicon(gicon: Gio.Icon | None, pixel_size: int) -> Gtk.Image:
     image = Gtk.Image()
@@ -19,6 +14,22 @@ def _image_from_gicon(gicon: Gio.Icon | None, pixel_size: int) -> Gtk.Image:
     else:
         image.set_from_icon_name("application-x-executable")
     return image
+
+
+def _primary_menu_button() -> Gtk.MenuButton:
+    menu = Gio.Menu()
+    help_section = Gio.Menu()
+    help_section.append("How to refresh icons", "app.refresh-help")
+    menu.append_section(None, help_section)
+    about_section = Gio.Menu()
+    about_section.append("About Glyph", "app.about")
+    menu.append_section(None, about_section)
+    return Gtk.MenuButton(
+        icon_name="open-menu-symbolic",
+        tooltip_text="Main menu",
+        menu_model=menu,
+        primary=True,
+    )
 
 
 class GlyphWindow(Adw.ApplicationWindow):
@@ -54,10 +65,7 @@ class GlyphWindow(Adw.ApplicationWindow):
         self.search.connect("search-changed", self._on_search)
         header.set_title_widget(self.search)
 
-        about = Gtk.Button(icon_name="help-about-symbolic")
-        about.set_tooltip_text("About Glyph")
-        about.connect("clicked", lambda *_: self.get_application().activate_action("about", None))
-        header.pack_end(about)
+        header.pack_end(_primary_menu_button())
         toolbar.add_top_bar(header)
 
         self.listbox = Gtk.ListBox()
@@ -147,6 +155,7 @@ class GlyphWindow(Adw.ApplicationWindow):
     def _build_detail_page(self, app: AppEntry) -> Adw.NavigationPage:
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
+        header.pack_end(_primary_menu_button())
         toolbar.add_top_bar(header)
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
@@ -154,23 +163,25 @@ class GlyphWindow(Adw.ApplicationWindow):
         box.set_margin_bottom(24)
         box.set_margin_start(18)
         box.set_margin_end(18)
-        box.set_halign(Gtk.Align.CENTER)
+
+        hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        hero.set_halign(Gtk.Align.CENTER)
 
         self._icon_host = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self._icon_host.set_halign(Gtk.Align.CENTER)
         self._detail_icon = _image_from_gicon(app.gicon, 96)
         self._icon_host.append(self._detail_icon)
-        box.append(self._icon_host)
+        hero.append(self._icon_host)
 
         self._detail_title = Gtk.Label(label=app.name)
         self._detail_title.add_css_class("title-1")
         self._detail_title.set_wrap(True)
         self._detail_title.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
-        box.append(self._detail_title)
+        hero.append(self._detail_title)
 
         self._detail_source = Gtk.Label()
         self._detail_source.add_css_class("dim-label")
-        box.append(self._detail_source)
+        hero.append(self._detail_source)
 
         buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         buttons.set_halign(Gtk.Align.CENTER)
@@ -186,19 +197,42 @@ class GlyphWindow(Adw.ApplicationWindow):
         self._revert_button.add_css_class("pill")
         self._revert_button.connect("clicked", self._on_revert)
         buttons.append(self._revert_button)
-        box.append(buttons)
+        hero.append(buttons)
+        box.append(hero)
 
-        note = Gtk.Label(label=REFRESH_NOTE)
-        note.set_wrap(True)
-        note.set_max_width_chars(40)
-        note.set_justify(Gtk.Justification.CENTER)
-        note.add_css_class("dim-label")
-        note.add_css_class("caption")
-        box.append(note)
+        group = Adw.PreferencesGroup()
+        self._desktop_file_row = Adw.ActionRow(title="Desktop file")
+        self._desktop_file_row.set_subtitle_lines(2)
+        self._open_desktop_file = Gtk.Button(icon_name="folder-open-symbolic")
+        self._open_desktop_file.add_css_class("flat")
+        self._open_desktop_file.set_valign(Gtk.Align.CENTER)
+        self._open_desktop_file.set_tooltip_text("Open in Files")
+        self._open_desktop_file.connect("clicked", self._on_open_desktop_file)
+        self._desktop_file_row.add_suffix(self._open_desktop_file)
+        group.add(self._desktop_file_row)
 
-        clamp = Adw.Clamp(maximum_size=480)
+        self._app_folder_row = Adw.ActionRow(title="App folder")
+        self._app_folder_row.set_subtitle_lines(2)
+        self._open_app_folder = Gtk.Button(icon_name="folder-open-symbolic")
+        self._open_app_folder.add_css_class("flat")
+        self._open_app_folder.set_valign(Gtk.Align.CENTER)
+        self._open_app_folder.set_tooltip_text("Open in Files")
+        self._open_app_folder.connect("clicked", self._on_open_app_folder)
+        self._app_folder_row.add_suffix(self._open_app_folder)
+        group.add(self._app_folder_row)
+
+        self._command_row = Adw.ActionRow(title="Command")
+        self._command_row.set_subtitle_lines(3)
+        group.add(self._command_row)
+        box.append(group)
+
+        clamp = Adw.Clamp(maximum_size=560)
         clamp.set_child(box)
-        toolbar.set_content(clamp)
+
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_child(clamp)
+        toolbar.set_content(scrolled)
 
         self._detail_page = Adw.NavigationPage(title=app.name, child=toolbar)
         self._fill_detail(app)
@@ -215,6 +249,11 @@ class GlyphWindow(Adw.ApplicationWindow):
             subtitle += " · custom icon"
         self._detail_source.set_label(subtitle)
         self._revert_button.set_sensitive(app.custom)
+        self._desktop_file_row.set_subtitle(app.filename or "No desktop file")
+        self._open_desktop_file.set_sensitive(bool(app.filename))
+        self._app_folder_row.set_subtitle(app.app_folder or "Unknown")
+        self._open_app_folder.set_sensitive(bool(app.app_folder))
+        self._command_row.set_subtitle(app.command or "No command")
 
     def _on_change(self, _button: Gtk.Button) -> None:
         if not self._detail_id:
@@ -245,7 +284,7 @@ class GlyphWindow(Adw.ApplicationWindow):
             self._toast(str(exc))
             return
         self.reload()
-        self._toast("Icon updated.")
+        self._toast("Icon saved. Log out to refresh the app grid.")
 
     def _on_revert(self, _button: Gtk.Button) -> None:
         if not self._detail_id:
@@ -256,7 +295,32 @@ class GlyphWindow(Adw.ApplicationWindow):
             self._toast(str(exc))
             return
         self.reload()
-        self._toast("Original icon restored.")
+        self._toast("Original icon restored. Log out to refresh the app grid.")
+
+    def _on_open_desktop_file(self, _button: Gtk.Button) -> None:
+        if not self._detail_id:
+            return
+        app = self._find(self._detail_id)
+        if app is None or not app.filename:
+            return
+        launcher = Gtk.FileLauncher.new(Gio.File.new_for_path(app.filename))
+        launcher.open_containing_folder(self, None, self._on_open_file_done)
+
+    def _on_open_app_folder(self, _button: Gtk.Button) -> None:
+        if not self._detail_id:
+            return
+        app = self._find(self._detail_id)
+        if app is None or not app.app_folder:
+            return
+        launcher = Gtk.FileLauncher.new(Gio.File.new_for_path(app.app_folder))
+        launcher.open_containing_folder(self, None, self._on_open_file_done)
+
+    def _on_open_file_done(self, launcher: Gtk.FileLauncher, result: Gio.AsyncResult) -> None:
+        try:
+            launcher.open_containing_folder_finish(result)
+        except GLib.GError:
+            self._toast("Could not open Files.")
 
     def _toast(self, message: str) -> None:
         self.toast_overlay.add_toast(Adw.Toast(title=message))
+

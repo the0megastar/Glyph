@@ -43,7 +43,11 @@ gtk-update-icon-cache ~/.local/share/icons/hicolor
 
 ## After changing an icon
 
-The app grid usually updates immediately. **Pinned dash icons** sometimes keep the old image until you unpin and pin the app, or log out. Glyph does not restart GNOME Shell.
+Glyph writes the launcher override immediately. **GNOME Shell often keeps the old image in the app grid** until you log out and log back in. Opening the app can show the new icon on the dash for that window. Unpin/pin and `xdg-desktop-menu forceupdate` do not reliably clear the grid cache.
+
+Glyph does not restart GNOME Shell. On Wayland there is no safe way to force a grid refresh without ending the session.
+
+Each app page also shows the **Desktop file** path, resolved **App folder** (e.g. Flatpak active deploy directory or binary parent), and start **Command**. The folder buttons open the `.desktop` file or the installation directory in Files (Nautilus).
 
 Launcher icons are what this app changes. The icon inside a running window’s titlebar comes from the application itself and is out of scope.
 

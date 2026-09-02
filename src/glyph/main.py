@@ -19,6 +19,7 @@ class GlyphApplication(Adw.Application):
             flags=Gio.ApplicationFlags.DEFAULT_FLAGS,
         )
         self.create_action("quit", lambda *_: self.quit(), ["<primary>q"])
+        self.create_action("refresh-help", self.on_refresh_help)
         self.create_action("about", self.on_about)
 
     def do_activate(self):
@@ -26,6 +27,20 @@ class GlyphApplication(Adw.Application):
         if win is None:
             win = GlyphWindow(application=self)
         win.present()
+
+    def on_refresh_help(self, *_args):
+        dialog = Adw.AlertDialog(
+            heading="Refreshing icons",
+            body=(
+                "Glyph saves the new launcher icon immediately. GNOME Shell often "
+                "keeps the old image in the app grid until you log out and log back in.\n\n"
+                "Opening the app can show the new icon on the dash for that window. "
+                "Unpinning, pinning, or running desktop-menu update commands does not "
+                "clear the grid cache. Glyph cannot force a refresh."
+            ),
+        )
+        dialog.add_response("ok", "OK")
+        dialog.present(self.props.active_window)
 
     def on_about(self, *_args):
         dialog = Adw.AboutDialog(

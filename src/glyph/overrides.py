@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -98,8 +99,20 @@ def _icon_dest(desktop_id: str, source_image: Path) -> Path:
     suffix = source_image.suffix.lower()
     if suffix not in ALLOWED_SUFFIXES:
         raise OverrideError(f"Unsupported image type: {suffix or '(none)'}")
+    digest = hashlib.sha256(source_image.read_bytes()).hexdigest()[:12]
     safe_id = desktop_id.replace("/", "_")
-    return ICONS_DIR / f"{safe_id}{suffix}"
+    return ICONS_DIR / f"{safe_id}-{digest}{suffix}"
+
+
+def _unlink_glyph_icon(path: Path | None) -> None:
+    if path is None:
+        return
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return
+    if resolved.is_file() and ICONS_DIR in resolved.parents:
+        resolved.unlink()
 
 
 def refresh_desktop_database(path: Path | None = None) -> None:
@@ -156,6 +169,11 @@ def apply_icon(desktop_id: str, source_desktop: str, image_path: str) -> dict:
     os.utime(local, None)
 
     state = load_state()
+    previous = state.get(desktop_id, {})
+    old_icon = previous.get("icon_path")
+    if old_icon and old_icon != str(dest_icon):
+        _unlink_glyph_icon(Path(old_icon))
+
     record = {
         "created_local": created_local,
         "icon_path": str(dest_icon),
@@ -187,11 +205,8 @@ def revert_icon(desktop_id: str) -> None:
         local.write_text(set_icon_value(text, original), encoding="utf-8")
         os.utime(local, None)
 
-    icon_path = record.get("icon_path")
-    if icon_path:
-        path = Path(icon_path)
-        if path.is_file() and ICONS_DIR in path.resolve().parents:
-            path.unlink()
+    if record.get("icon_path"):
+        _unlink_glyph_icon(Path(record["icon_path"]))
 
     del state[desktop_id]
     save_state(state)
