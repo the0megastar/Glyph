@@ -19,6 +19,26 @@ class AppEntry:
     gicon: Gio.Icon | None
     source: str
     custom: bool
+    has_stock: bool = False
+    stock_filename: str = ""
+
+
+STOCK_APPLICATION_DIRS = [
+    Path("/usr/share/applications"),
+    Path("/usr/local/share/applications"),
+    Path("/var/lib/flatpak/exports/share/applications"),
+    Path.home() / ".local/share/flatpak/exports/share/applications",
+    Path("/var/lib/snapd/desktop/applications"),
+]
+
+
+def find_stock_desktop_file(desktop_id: str) -> str:
+    name = desktop_id if desktop_id.endswith(".desktop") else f"{desktop_id}.desktop"
+    for directory in STOCK_APPLICATION_DIRS:
+        candidate = directory / name
+        if candidate.is_file():
+            return str(candidate)
+    return ""
 
 
 def classify_source(path: str) -> str:
@@ -28,8 +48,9 @@ def classify_source(path: str) -> str:
     if "/snapd/" in p or "/snap/" in p:
         return "Snap"
     if "/.local/share/applications/" in p:
-        return "User"
+        return "Local"
     return "RPM"
+
 
 
 def _icon_value(info: Gio.DesktopAppInfo) -> str:
@@ -134,9 +155,18 @@ def list_apps(overrides: dict[str, dict]) -> list[AppEntry]:
         app_folder = _resolve_app_folder(info)
         command = info.get_commandline() or ""
         override = overrides.get(desktop_id)
-        source_path = (override or {}).get("source_path") or filename
-        source = classify_source(source_path)
         custom = override is not None
+
+        stock_filename = find_stock_desktop_file(desktop_id)
+        has_stock = bool(stock_filename)
+        is_local_file = "/.local/share/applications/" in filename.replace("\\", "/")
+
+        if is_local_file and has_stock:
+            source = classify_source(stock_filename)
+        elif is_local_file:
+            source = "Local"
+        else:
+            source = classify_source(filename)
 
         gicon = info.get_icon()
         icon_path = (override or {}).get("icon_path")
@@ -154,6 +184,8 @@ def list_apps(overrides: dict[str, dict]) -> list[AppEntry]:
                 gicon=gicon,
                 source=source,
                 custom=custom,
+                has_stock=has_stock,
+                stock_filename=stock_filename,
             )
         )
 

@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import subprocess
+import tarfile
 from pathlib import Path
 
 XDG_DATA_HOME = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
@@ -211,3 +212,81 @@ def revert_icon(desktop_id: str) -> None:
     del state[desktop_id]
     save_state(state)
     refresh_desktop_database()
+
+
+def restore_stock_launcher(desktop_id: str) -> None:
+    local_name = desktop_id if desktop_id.endswith(".desktop") else f"{desktop_id}.desktop"
+    local_file = APPLICATIONS_DIR / local_name
+    if local_file.is_file():
+        local_file.unlink()
+
+    state = load_state()
+    if desktop_id in state:
+        record = state[desktop_id]
+        if record.get("icon_path"):
+            _unlink_glyph_icon(Path(record["icon_path"]))
+        del state[desktop_id]
+        save_state(state)
+
+    refresh_desktop_database()
+
+
+def revert_all_icons() -> int:
+    state = load_state()
+    count = 0
+    for desktop_id in list(state.keys()):
+        try:
+            revert_icon(desktop_id)
+            count += 1
+        except Exception:
+            pass
+    return count
+
+
+def export_backup(target_path: Path) -> int:
+    state = load_state()
+    count = len(state)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(target_path, "w:gz") as tar:
+        if STATE_FILE.is_file():
+            tar.add(STATE_FILE, arcname="overrides.json")
+        if ICONS_DIR.is_dir():
+            tar.add(ICONS_DIR, arcname="icons")
+    return count
+
+
+def import_backup(source_path: Path) -> int:
+    if not source_path.is_file():
+        raise OverrideError("Backup file does not exist.")
+
+    _ensure_dirs()
+    try:
+        with tarfile.open(source_path, "r:gz") as tar:
+            tar.extractall(DATA_DIR, filter="data")
+    except Exception as exc:
+        raise OverrideError(f"Failed to extract backup: {exc}")
+
+    state = load_state()
+    count = 0
+    for _desktop_id, record in state.items():
+        local_path = record.get("local_desktop")
+        icon_path = record.get("icon_path")
+        if local_path and icon_path and Path(icon_path).is_file():
+            local = Path(local_path)
+            if local.is_file():
+                text = local.read_text(encoding="utf-8")
+                local.write_text(set_icon_value(text, icon_path), encoding="utf-8")
+                os.utime(local, None)
+                count += 1
+            else:
+                source_path = record.get("source_path")
+                if source_path and Path(source_path).is_file():
+                    shutil.copy2(source_path, local)
+                    text = local.read_text(encoding="utf-8")
+                    local.write_text(set_icon_value(text, icon_path), encoding="utf-8")
+                    os.utime(local, None)
+                    count += 1
+
+    refresh_desktop_database()
+    return count
+

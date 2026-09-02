@@ -35,11 +35,31 @@ update-desktop-database ~/.local/share/applications
 gtk-update-icon-cache ~/.local/share/icons/hicolor
 ```
 
+## Features
+
+- **App-by-App Icon Customization**: Click "Change icon" or drag and drop any image (`.png`, `.svg`, `.webp`, `.jpg`) directly onto the 96px icon preview.
+- **Customized Filter**: Toggle between all installed applications and only those customized with Glyph.
+- **Restore Stock & Revert**:
+  - Revert custom icons back to their original state with one click.
+  - For applications with local overrides shadowing system or Flatpak packages, click "Restore stock" to safely remove the local launcher and reset to upstream defaults.
+- **App Details**: Inspect the **Desktop file** path, resolved **App folder** (e.g. Flatpak active deploy directory or binary directory), and start **Command**, with buttons to open locations in Files (Nautilus).
+- **Primary Menu**:
+  - **Revert All Custom Icons**: Reset all Glyph overrides at once with a confirmation dialog.
+  - **Backup & Restore Overrides**: Export or import your customizations as a `.tar.gz` bundle for backups or dotfile synchronization across machines.
+  - **Open Data Folder in Files**: Inspect `~/.local/share/glyph/` directly.
+
+## Sources
+
+- **RPM**: System-packaged applications installed via DNF/RPM.
+- **Flatpak**: Flatpak applications from system or user installations.
+- **Local**: Applications installed directly in user space (e.g. `~/.local/bin/` or manual user desktop entries).
+
 ## How revert works
 
 - If Glyph created the local `.desktop` file, revert **deletes** it so the system or Flatpak entry is used again.
 - If you already had a local `.desktop` file, revert restores only the previous `Icon=` value.
-- Copied images and `~/.local/share/glyph/overrides.json` are cleaned up for that app.
+- "Restore stock" removes the local `.desktop` override completely so GNOME falls back to the system package.
+- Copied images and `~/.local/share/glyph/overrides.json` are cleaned up.
 
 ## After changing an icon
 
@@ -47,9 +67,8 @@ Glyph writes the launcher override immediately. **GNOME Shell often keeps the ol
 
 Glyph does not restart GNOME Shell. On Wayland there is no safe way to force a grid refresh without ending the session.
 
-Each app page also shows the **Desktop file** path, resolved **App folder** (e.g. Flatpak active deploy directory or binary parent), and start **Command**. The folder buttons open the `.desktop` file or the installation directory in Files (Nautilus).
-
 Launcher icons are what this app changes. The icon inside a running window’s titlebar comes from the application itself and is out of scope.
+
 
 ## Development
 
