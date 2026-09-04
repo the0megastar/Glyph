@@ -2,11 +2,11 @@
 Name=Glyph
 Comment=Find applications and change or restore their icons
 Exec=glyph
-Icon=dev.the0megastar.Glyph
+Icon=io.github.the0megastar.Glyph
 Terminal=false
 Type=Application
 Categories=Settings;DesktopSettings;
 Keywords=icon;desktop;launcher;theme;
 StartupNotify=true
-StartupWMClass=dev.the0megastar.Glyph
+StartupWMClass=io.github.the0megastar.Glyph
 DBusActivatable=false

@@ -50,7 +50,7 @@ meson compile -C build
 meson install -C build
 ```
 
-That puts `glyph` on your `PATH` (if `~/.local/bin` is on it), installs `dev.the0megastar.Glyph.desktop`, and installs the app icon. You may need to log out once, or run:
+That puts `glyph` on your `PATH` (if `~/.local/bin` is on it), installs `io.github.the0megastar.Glyph.desktop`, and installs the app icon. You may need to log out once, or run:
 
 ```bash
 update-desktop-database ~/.local/share/applications
@@ -112,11 +112,11 @@ meson devenv -C build python3 -m glyph
 
 ## Flatpak
 
-Glyph can be built and run as a sandboxed Flatpak using the included manifest (`dev.the0megastar.Glyph.yaml`).
+Glyph can be built and run as a sandboxed Flatpak using the included manifest (`io.github.the0megastar.Glyph.yaml`).
 
 ### Building with Flatpak Builder
 
 ```bash
-flatpak-builder --user --install --force-clean build-flatpak dev.the0megastar.Glyph.yaml
-flatpak run dev.the0megastar.Glyph
+flatpak-builder --user --install --force-clean build-flatpak io.github.the0megastar.Glyph.yaml
+flatpak run io.github.the0megastar.Glyph
 ```

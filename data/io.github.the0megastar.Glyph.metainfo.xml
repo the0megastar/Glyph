@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>dev.the0megastar.Glyph</id>
+  <id>io.github.the0megastar.Glyph</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
 
@@ -22,11 +22,11 @@
     </ul>
   </description>
 
-  <developer id="dev.the0megastar">
+  <developer id="io.github.the0megastar">
     <name>the0megastar</name>
   </developer>
 
-  <launchable type="desktop-id">dev.the0megastar.Glyph.desktop</launchable>
+  <launchable type="desktop-id">io.github.the0megastar.Glyph.desktop</launchable>
 
   <url type="homepage">https://the0megastar.github.io/Glyph</url>
   <url type="bugtracker">https://github.com/the0megastar/Glyph/issues</url>

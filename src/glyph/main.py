@@ -19,7 +19,7 @@ from glyph.overrides import (  # noqa: E402
 )
 from glyph.window import GlyphWindow  # noqa: E402
 
-APP_ID = "dev.the0megastar.Glyph"
+APP_ID = "io.github.the0megastar.Glyph"
 
 
 class GlyphApplication(Adw.Application):
