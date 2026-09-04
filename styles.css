@@ -308,27 +308,35 @@ body {
 }
 
 .btn-kofi {
-  background: rgba(241, 96, 97, 0.12);
-  border-color: rgba(241, 96, 97, 0.3);
-  color: #ff7273;
+  background: #ff5e5b;
+  border-color: #ff5e5b;
+  color: #ffffff !important;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(255, 94, 91, 0.25);
 }
 
 .btn-kofi:hover {
-  background: rgba(241, 96, 97, 0.22);
-  border-color: #f16061;
+  background: #ff4340;
+  border-color: #ff4340;
+  color: #ffffff !important;
   transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 94, 91, 0.38);
 }
 
 .btn-sponsor {
-  background: rgba(234, 74, 170, 0.12);
-  border-color: rgba(234, 74, 170, 0.3);
-  color: #ea4aaa;
+  background: #ea4aaa;
+  border-color: #ea4aaa;
+  color: #ffffff !important;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(234, 74, 170, 0.25);
 }
 
 .btn-sponsor:hover {
-  background: rgba(234, 74, 170, 0.22);
-  border-color: #ea4aaa;
+  background: #d83597;
+  border-color: #d83597;
+  color: #ffffff !important;
   transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(234, 74, 170, 0.38);
 }
 
 /* Command Snippet Box */
@@ -673,13 +681,11 @@ body {
 }
 
 .support-banner {
-  background: var(--bg-card);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--bg-surface);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-xl);
   padding: 56px 36px;
-  max-width: 840px;
+  max-width: 820px;
   margin: 0 auto;
   box-shadow: var(--card-shadow);
   position: relative;
@@ -690,9 +696,9 @@ body {
   content: "";
   position: absolute;
   top: 0;
-  left: 25%;
-  right: 25%;
-  height: 2px;
+  left: 20%;
+  right: 20%;
+  height: 3px;
   background: var(--accent-gradient);
   border-radius: var(--radius-full);
 }
@@ -701,14 +707,16 @@ body {
   font-family: var(--font-heading);
   font-size: 2.2rem;
   font-weight: 800;
-  margin-bottom: 16px;
+  color: var(--text-main);
+  margin-bottom: 14px;
 }
 
 .support-desc {
   color: var(--text-muted);
-  font-size: 1.1rem;
-  max-width: 580px;
+  font-size: 1.05rem;
+  max-width: 600px;
   margin: 0 auto 32px;
+  line-height: 1.6;
 }
 
 .support-buttons {
