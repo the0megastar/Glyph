@@ -2,6 +2,12 @@
 
 A modern Linux desktop application to browse installed applications, customize launcher icons and display names, and easily restore originals.
 
+<p align="center">
+  <img src="data/screenshots/library.png" alt="Glyph Library View" width="420" />
+  &nbsp;
+  <img src="data/screenshots/detail.png" alt="Glyph Detail View" width="420" />
+</p>
+
 Glyph never edits system files under `/usr/share/applications` or Flatpak/Snap export directories. It safely creates user-level overrides in `~/.local/share/applications/` (the standard FreeDesktop.org specification), copies customized icons into `~/.local/share/glyph/icons/`, and tracks state to allow clean, non-destructive reversion at any time.
 
 ## Compatibility & Desktop Environments
