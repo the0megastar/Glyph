@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Glyph — Modern Comic & Manga Reader for Linux</title>
+  <meta name="description" content="A modern, clean, and elegant comic and manga reader for Linux built natively with GTK4 and Libadwaita. Supports CBZ, CBR, PDF, RTL Manga mode, and dual-page reading.">
+  <meta name="keywords" content="Glyph, comic reader, manga reader, linux, flatpak, gtk4, libadwaita, cbz, cbr, gnome">
+  <meta name="author" content="the0megastar">
+
+  <!-- Open Graph / Social Sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://the0megastar.github.io/Glyph/">
+  <meta property="og:title" content="Glyph — Modern Comic & Manga Reader for Linux">
+  <meta property="og:description" content="Clean, distraction-free comic and manga reader crafted natively for GNOME and the Linux desktop.">
+  <meta property="og:image" content="assets/library.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="assets/glyph.svg">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="ambient-glow" aria-hidden="true"></div>
+
+  <!-- Sticky Navbar -->
+  <header class="navbar">
+    <nav class="nav-inner" aria-label="Main Navigation">
+      <a href="#" class="nav-brand" aria-label="Glyph Home">
+        <img src="assets/glyph.svg" alt="Glyph icon" class="nav-logo" width="34" height="34">
+        <span class="nav-title">Glyph</span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="#showcase" class="nav-link">Showcase</a></li>
+        <li><a href="#features" class="nav-link">Features</a></li>
+        <li><a href="#install" class="nav-link">Install</a></li>
+        <li><a href="#releases" class="nav-link">Releases</a></li>
+        <li><a href="#support" class="nav-link">Support</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <button id="themeToggleBtn" class="theme-toggle-btn" aria-label="Toggle light and dark theme" title="Toggle theme">
+          <svg class="sun-icon" style="display:none;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+
+        <a href="https://github.com/the0megastar/Glyph" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.88rem;" aria-label="GitHub Repository">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+          </svg>
+          <span>Star</span>
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero-section" id="hero">
+      <div class="container">
+        <div class="version-pill">
+          <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#33d17a;"></span>
+          v0.1.0 • Native GTK4 & Libadwaita
+        </div>
+
+        <div class="hero-icon-wrapper">
+          <img src="assets/glyph.svg" alt="Glyph App Icon" class="hero-icon" width="120" height="120">
+        </div>
+
+        <h1 class="hero-title">
+          Modern Comic & Manga Reader <br>
+          <span class="gradient-text">for the Linux Desktop</span>
+        </h1>
+
+        <p class="hero-subtitle">
+          A lightning-fast, distraction-free comic and manga reader crafted specifically for GNOME. Experience smooth dual-page spreads, authentic right-to-left manga progression, and seamless archive reading.
+        </p>
+
+        <div class="hero-cta">
+          <a href="https://flathub.org/apps/io.github.the0megastar.Glyph" target="_blank" rel="noopener noreferrer" class="btn btn-primary" id="flathubCtaBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+            </svg>
+            <span>Get on Flathub</span>
+          </a>
+
+          <a href="https://github.com/the0megastar/Glyph" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+            </svg>
+            <span>Source Code</span>
+          </a>
+
+          <a href="https://ko-fi.com/the0megastar" target="_blank" rel="noopener noreferrer" class="btn btn-kofi">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.683-2.566l.044-2.884s2.21.328 3.737-.899c1.611-1.297 2.122-4.301 2.848-4.301zm-4.733 2.775c-.69 1.15-2.029 1.066-2.029 1.066V6.994s1.776-.118 2.156 1.085c.38 1.203.563 2.019-.127 3.644z"></path>
+            </svg>
+            <span>Support on Ko-fi</span>
+          </a>
+        </div>
+
+        <div class="command-box" id="install">
+          <span class="command-text" id="commandText">flatpak install flathub io.github.the0megastar.Glyph</span>
+          <button class="copy-btn" id="copyBtn" aria-label="Copy Flatpak install command to clipboard">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span id="copyBtnLabel">Copy</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- App Showcase / Screenshots -->
+    <section class="showcase-section" id="showcase">
+      <div class="container">
+        <div class="showcase-tabs" role="tablist" aria-label="App screenshot views">
+          <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="view-library" id="tab-library" data-target="library">
+            Library View
+          </button>
+          <button class="tab-btn" role="tab" aria-selected="false" aria-controls="view-reader" id="tab-reader" data-target="detail">
+            Reader View
+          </button>
+        </div>
+
+        <div class="window-frame">
+          <div class="window-header">
+            <div class="window-controls" aria-hidden="true">
+              <span class="window-dot close"></span>
+              <span class="window-dot min"></span>
+              <span class="window-dot max"></span>
+            </div>
+            <div class="window-title" id="windowTitle">Glyph — Comic Library</div>
+          </div>
+          <div class="window-content">
+            <img src="assets/library.png" alt="Glyph Library View showcasing comic collection grid with search and clean sidebar" class="showcase-img" id="img-library" width="1280" height="800">
+            <img src="assets/detail.png" alt="Glyph Reader View showing immersive reading experience with navigation toolbar" class="showcase-img hidden" id="img-detail" width="1280" height="800">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section" id="features">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Designed for GNOME</div>
+          <h2 class="section-title">Built for pure reading bliss</h2>
+          <p class="section-desc">Every pixel is designed to feel right at home on modern Linux desktops with zero clutter.</p>
+        </div>
+
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+            </div>
+            <h3 class="feature-title">Native Libadwaita</h3>
+            <p class="feature-text">Crafted with GTK4 and Libadwaita to integrate seamlessly with your system theme, accent colors, and desktop animations.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+              </svg>
+            </div>
+            <h3 class="feature-title">Manga RTL Reading</h3>
+            <p class="feature-text">Authentic right-to-left page turning designed specifically for Japanese manga, alongside standard western LTR modes.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+              </svg>
+            </div>
+            <h3 class="feature-title">Universal Format Support</h3>
+            <p class="feature-text">Opens CBZ, CBR, PDF, ZIP, RAR, Tar, and 7z archives with blazing-fast unpacking and zero waiting.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="18" rx="1"></rect>
+                <rect x="14" y="3" width="7" height="18" rx="1"></rect>
+              </svg>
+            </div>
+            <h3 class="feature-title">Dual-Page Spreads</h3>
+            <p class="feature-text">Enjoy two-page side-by-side spreads just like reading a physical comic book, with intelligent cover page handling.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <h3 class="feature-title">100% Private & Offline</h3>
+            <p class="feature-text">No trackers, no telemetry, no cloud sync required. Your reading habits and comic collection stay entirely on your machine.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M15 3h6v6"></path>
+                <path d="M9 21H3v-6"></path>
+                <path d="M21 3l-7 7"></path>
+                <path d="M3 21l7-7"></path>
+              </svg>
+            </div>
+            <h3 class="feature-title">Immersive Fullscreen</h3>
+            <p class="feature-text">Tap F11 or double-click to hide all window chrome for a pure, distraction-free reading canvas with smooth zoom and pan.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-section">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Workflow</div>
+          <h2 class="section-title">How Glyph Works</h2>
+          <p class="section-desc">Get into your favorite stories in three straightforward steps.</p>
+        </div>
+
+        <div class="steps-grid">
+          <div class="step-card">
+            <div class="step-number">1</div>
+            <h3 class="step-title">Add Your Comics</h3>
+            <p class="step-desc">Open individual comic archives or organize your entire collection folder into a clean visual bookshelf.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-number">2</div>
+            <h3 class="step-title">Pick Your Layout</h3>
+            <p class="step-desc">Select single page, double-page spread, or toggle manga RTL flow with a single click or keyboard shortcut.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-number">3</div>
+            <h3 class="step-title">Read in Full Flow</h3>
+            <p class="step-desc">Navigate smoothly using arrow keys, spacebar, or touch gestures. Your progress is saved automatically.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Release Section -->
+    <section class="release-section" id="releases">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Latest Update</div>
+          <h2 class="section-title">Release Notes</h2>
+        </div>
+
+        <div class="release-card">
+          <div class="release-header">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.4rem; font-weight: 700;">Glyph v0.1.0</h3>
+              <span style="font-size: 0.88rem; color: var(--text-dim);">Initial Beta Release</span>
+            </div>
+            <span class="release-badge">Latest</span>
+          </div>
+
+          <ul class="release-notes-list">
+            <li>Native GTK4 and Libadwaita modern user interface.</li>
+            <li>Comprehensive archive support: CBZ, CBR, PDF, ZIP, and RAR archives.</li>
+            <li>Right-to-Left (RTL) reading mode tailored for authentic Manga reading.</li>
+            <li>Dual-page side-by-side spread view with automatic cover page detection.</li>
+            <li>Distraction-free fullscreen reading mode with keyboard shortcuts.</li>
+            <li>Instant search and grid layout for personal comic collections.</li>
+            <li>Flatpak packaging for sandboxed, secure installation on any Linux distro.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Support Section -->
+    <section class="support-section" id="support">
+      <div class="container">
+        <div class="support-banner">
+          <h2 class="support-title">Support Independent Open Source</h2>
+          <p class="support-desc">
+            Glyph is completely free, open source (GPL-3.0), and developed with passion for the Linux community. If you enjoy reading with Glyph, consider supporting ongoing development!
+          </p>
+          <div class="support-buttons">
+            <a href="https://ko-fi.com/the0megastar" target="_blank" rel="noopener noreferrer" class="btn btn-kofi" style="font-size: 1.05rem; padding: 14px 30px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.683-2.566l.044-2.884s2.21.328 3.737-.899c1.611-1.297 2.122-4.301 2.848-4.301zm-4.733 2.775c-.69 1.15-2.029 1.066-2.029 1.066V6.994s1.776-.118 2.156 1.085c.38 1.203.563 2.019-.127 3.644z"></path>
+              </svg>
+              <span>Buy a Coffee on Ko-fi</span>
+            </a>
+            <a href="https://github.com/the0megastar/Glyph" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="font-size: 1.05rem; padding: 14px 30px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+              </svg>
+              <span>Star on GitHub</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div>
+        <span>Glyph &copy; 2026 the0megastar. Licensed under GNU GPL-3.0.</span>
+      </div>
+      <ul class="footer-links">
+        <li><a href="https://github.com/the0megastar/Glyph" target="_blank" rel="noopener noreferrer">Source Code</a></li>
+        <li><a href="https://github.com/the0megastar/Glyph/issues" target="_blank" rel="noopener noreferrer">Issue Tracker</a></li>
+        <li><a href="https://flathub.org/apps/io.github.the0megastar.Glyph" target="_blank" rel="noopener noreferrer">Flathub</a></li>
+        <li><a href="https://ko-fi.com/the0megastar" target="_blank" rel="noopener noreferrer">Donate</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <!-- App Script -->
+  <script src="app.js"></script>
+</body>
+</html>
