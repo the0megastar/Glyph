@@ -77,11 +77,11 @@ function initScreenshotTabs() {
       if (target === 'detail') {
         imgLibrary.classList.add('hidden');
         imgDetail.classList.remove('hidden');
-        if (windowTitle) windowTitle.textContent = 'Glyph — Manga & Comic Reader';
+        if (windowTitle) windowTitle.textContent = 'Glyph — Customize Application';
       } else {
         imgDetail.classList.add('hidden');
         imgLibrary.classList.remove('hidden');
-        if (windowTitle) windowTitle.textContent = 'Glyph — Comic Library';
+        if (windowTitle) windowTitle.textContent = 'Glyph — Installed Applications';
       }
     });
   });
@@ -108,7 +108,7 @@ function initCopyButton() {
         if (copyBtnLabel) copyBtnLabel.textContent = 'Copy';
       }, 2200);
     } catch (err) {
-      // Fallback for older browsers
+      // Fallback for clipboard
       const textarea = document.createElement('textarea');
       textarea.value = textToCopy;
       textarea.style.position = 'fixed';

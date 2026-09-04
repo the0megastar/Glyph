@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Glyph — Modern Comic & Manga Reader for Linux</title>
-  <meta name="description" content="A modern, clean, and elegant comic and manga reader for Linux built natively with GTK4 and Libadwaita. Supports CBZ, CBR, PDF, RTL Manga mode, and dual-page reading.">
-  <meta name="keywords" content="Glyph, comic reader, manga reader, linux, flatpak, gtk4, libadwaita, cbz, cbr, gnome">
+  <title>Glyph — Customize Application Icons & Launchers on Linux</title>
+  <meta name="description" content="A modern desktop utility for Linux to browse installed applications, customize launcher icons and display names safely at the user level, and easily restore system defaults.">
+  <meta name="keywords" content="Glyph, linux, customize icons, desktop files, app launcher, flatpak, gtk4, libadwaita, gnome, freedesktop">
   <meta name="author" content="the0megastar">
 
   <!-- Open Graph / Social Sharing -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://the0megastar.github.io/Glyph/">
-  <meta property="og:title" content="Glyph — Modern Comic & Manga Reader for Linux">
-  <meta property="og:description" content="Clean, distraction-free comic and manga reader crafted natively for GNOME and the Linux desktop.">
+  <meta property="og:title" content="Glyph — Customize Application Icons & Launchers on Linux">
+  <meta property="og:description" content="Personalize your Linux app grid safely. Change application launcher icons and names without root permissions, with instant one-click restore.">
   <meta property="og:image" content="assets/library.png">
 
   <!-- Favicon -->
@@ -87,12 +87,12 @@
         </div>
 
         <h1 class="hero-title">
-          Modern Comic & Manga Reader <br>
-          <span class="gradient-text">for the Linux Desktop</span>
+          Customize Application Icons <br>
+          <span class="gradient-text">on the Linux Desktop</span>
         </h1>
 
         <p class="hero-subtitle">
-          A lightning-fast, distraction-free comic and manga reader crafted specifically for GNOME. Experience smooth dual-page spreads, authentic right-to-left manga progression, and seamless archive reading.
+          An intuitive, modern utility to browse installed applications, customize launcher icons and display names, and cleanly restore original system defaults at any time without touching root files.
         </p>
 
         <div class="hero-cta">
@@ -136,10 +136,10 @@
       <div class="container">
         <div class="showcase-tabs" role="tablist" aria-label="App screenshot views">
           <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="view-library" id="tab-library" data-target="library">
-            Library View
+            Applications View
           </button>
-          <button class="tab-btn" role="tab" aria-selected="false" aria-controls="view-reader" id="tab-reader" data-target="detail">
-            Reader View
+          <button class="tab-btn" role="tab" aria-selected="false" aria-controls="view-detail" id="tab-reader" data-target="detail">
+            Customization View
           </button>
         </div>
 
@@ -150,11 +150,11 @@
               <span class="window-dot min"></span>
               <span class="window-dot max"></span>
             </div>
-            <div class="window-title" id="windowTitle">Glyph — Comic Library</div>
+            <div class="window-title" id="windowTitle">Glyph — Installed Applications</div>
           </div>
           <div class="window-content">
-            <img src="assets/library.png" alt="Glyph Library View showcasing comic collection grid with search and clean sidebar" class="showcase-img" id="img-library" width="1280" height="800">
-            <img src="assets/detail.png" alt="Glyph Reader View showing immersive reading experience with navigation toolbar" class="showcase-img hidden" id="img-detail" width="1280" height="800">
+            <img src="assets/library.png" alt="Glyph Applications List View displaying installed system and Flatpak apps with filter and search" class="showcase-img" id="img-library" width="1280" height="800">
+            <img src="assets/detail.png" alt="Glyph Customization View showing icon preview, rename tools, desktop file paths, and launch button" class="showcase-img hidden" id="img-detail" width="1280" height="800">
           </div>
         </div>
       </div>
@@ -164,33 +164,65 @@
     <section class="features-section" id="features">
       <div class="container">
         <div class="section-header">
-          <div class="section-tag">Designed for GNOME</div>
-          <h2 class="section-title">Built for pure reading bliss</h2>
-          <p class="section-desc">Every pixel is designed to feel right at home on modern Linux desktops with zero clutter.</p>
+          <div class="section-tag">Powerful & Safe</div>
+          <h2 class="section-title">Designed for Complete Desktop Freedom</h2>
+          <p class="section-desc">Personalize your app launchers and icons cleanly without root permissions or modifying package-managed files.</p>
         </div>
 
         <div class="features-grid">
           <div class="feature-card">
             <div class="feature-icon-box">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                <line x1="8" y1="21" x2="16" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
               </svg>
             </div>
-            <h3 class="feature-title">Native Libadwaita</h3>
-            <p class="feature-text">Crafted with GTK4 and Libadwaita to integrate seamlessly with your system theme, accent colors, and desktop animations.</p>
+            <h3 class="feature-title">Safe User-Level Overrides</h3>
+            <p class="feature-text">Never modifies system files in <code>/usr/share/applications</code>. Creates compliant FreeDesktop XDG overrides in <code>~/.local/share/applications</code> that preserve original packages.</p>
           </div>
 
           <div class="feature-card">
             <div class="feature-icon-box">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
               </svg>
             </div>
-            <h3 class="feature-title">Manga RTL Reading</h3>
-            <p class="feature-text">Authentic right-to-left page turning designed specifically for Japanese manga, alongside standard western LTR modes.</p>
+            <h3 class="feature-title">Drag & Drop Icon Replacement</h3>
+            <p class="feature-text">Simply drag and drop any image (SVG, PNG, WebP, JPG) directly onto the 96px icon preview, or browse your files to set your favorite custom artwork.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </div>
+            <h3 class="feature-title">Custom Display Names</h3>
+            <p class="feature-text">Rename any application launcher right from the app page with automatic locale stripping and an instant one-click undo (↺) button.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+              </svg>
+            </div>
+            <h3 class="feature-title">Instant One-Click Restore</h3>
+            <p class="feature-text">Easily revert individual icons and names, or click "Restore All to System Default" to safely wipe overrides and restore upstream package defaults.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polygon points="10 8 16 12 10 16 10 8"></polygon>
+              </svg>
+            </div>
+            <h3 class="feature-title">Inspect & Test Launch</h3>
+            <p class="feature-text">Inspect the resolved Desktop file, App folder, and start Command with direct links to open locations in Files, plus a header Launch button to test immediately.</p>
           </div>
 
           <div class="feature-card">
@@ -201,75 +233,39 @@
                 <line x1="12" y1="22.08" x2="12" y2="12"></line>
               </svg>
             </div>
-            <h3 class="feature-title">Universal Format Support</h3>
-            <p class="feature-text">Opens CBZ, CBR, PDF, ZIP, RAR, Tar, and 7z archives with blazing-fast unpacking and zero waiting.</p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="7" height="18" rx="1"></rect>
-                <rect x="14" y="3" width="7" height="18" rx="1"></rect>
-              </svg>
-            </div>
-            <h3 class="feature-title">Dual-Page Spreads</h3>
-            <p class="feature-text">Enjoy two-page side-by-side spreads just like reading a physical comic book, with intelligent cover page handling.</p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              </svg>
-            </div>
-            <h3 class="feature-title">100% Private & Offline</h3>
-            <p class="feature-text">No trackers, no telemetry, no cloud sync required. Your reading habits and comic collection stay entirely on your machine.</p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M15 3h6v6"></path>
-                <path d="M9 21H3v-6"></path>
-                <path d="M21 3l-7 7"></path>
-                <path d="M3 21l7-7"></path>
-              </svg>
-            </div>
-            <h3 class="feature-title">Immersive Fullscreen</h3>
-            <p class="feature-text">Tap F11 or double-click to hide all window chrome for a pure, distraction-free reading canvas with smooth zoom and pan.</p>
+            <h3 class="feature-title">Universal Compatibility</h3>
+            <p class="feature-text">Works seamlessly across GNOME, KDE Plasma, COSMIC, Cinnamon, XFCE, and handles System packages, Flatpaks, Snaps, and local AppImages.</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- How It Works -->
+    <!-- How It Works Flow -->
     <section class="how-section">
       <div class="container">
         <div class="section-header">
-          <div class="section-tag">Workflow</div>
-          <h2 class="section-title">How Glyph Works</h2>
-          <p class="section-desc">Get into your favorite stories in three straightforward steps.</p>
+          <div class="section-tag">How It Works</div>
+          <h2 class="section-title">Clean Customization in Three Steps</h2>
+          <p class="section-desc">No command line editing of .desktop files required.</p>
         </div>
 
         <div class="steps-grid">
           <div class="step-card">
             <div class="step-number">1</div>
-            <h3 class="step-title">Add Your Comics</h3>
-            <p class="step-desc">Open individual comic archives or organize your entire collection folder into a clean visual bookshelf.</p>
+            <h3 class="step-title">Select an Application</h3>
+            <p class="step-desc">Open Glyph and search through all installed desktop applications, or filter to see only apps you have customized.</p>
           </div>
 
           <div class="step-card">
             <div class="step-number">2</div>
-            <h3 class="step-title">Pick Your Layout</h3>
-            <p class="step-desc">Select single page, double-page spread, or toggle manga RTL flow with a single click or keyboard shortcut.</p>
+            <h3 class="step-title">Customize Icon & Name</h3>
+            <p class="step-desc">Drop your favorite SVG or PNG icon onto the preview and adjust the display name to match your personal setup.</p>
           </div>
 
           <div class="step-card">
             <div class="step-number">3</div>
-            <h3 class="step-title">Read in Full Flow</h3>
-            <p class="step-desc">Navigate smoothly using arrow keys, spacebar, or touch gestures. Your progress is saved automatically.</p>
+            <h3 class="step-title">Enjoy & Restore Anytime</h3>
+            <p class="step-desc">Your desktop menu and dash update automatically. If you ever change your mind, restore stock defaults with a single click.</p>
           </div>
         </div>
       </div>
@@ -293,13 +289,15 @@
           </div>
 
           <ul class="release-notes-list">
-            <li>Native GTK4 and Libadwaita modern user interface.</li>
-            <li>Comprehensive archive support: CBZ, CBR, PDF, ZIP, and RAR archives.</li>
-            <li>Right-to-Left (RTL) reading mode tailored for authentic Manga reading.</li>
-            <li>Dual-page side-by-side spread view with automatic cover page detection.</li>
-            <li>Distraction-free fullscreen reading mode with keyboard shortcuts.</li>
-            <li>Instant search and grid layout for personal comic collections.</li>
-            <li>Flatpak packaging for sandboxed, secure installation on any Linux distro.</li>
+            <li>Browse and search all installed desktop applications across System, Flatpak, and Snap.</li>
+            <li>Set custom application launcher icons using SVG, PNG, WebP, or JPG files.</li>
+            <li>Drag and drop image files directly onto the app icon preview.</li>
+            <li>Custom application display names with automatic locale stripping and one-click undo.</li>
+            <li>Filter dropdown to view all apps or only customized entries.</li>
+            <li>Safe user-level overrides in <code>~/.local/share/applications</code> without touching system files.</li>
+            <li>One-click revert for individual icons, custom names, or all system defaults.</li>
+            <li>Export and import overrides as <code>.tar.gz</code> bundles for backup and dotfile sync.</li>
+            <li>Native Libadwaita dark and light mode design adhering to GNOME Human Interface Guidelines.</li>
           </ul>
         </div>
       </div>
@@ -311,7 +309,7 @@
         <div class="support-banner">
           <h2 class="support-title">Support Independent Open Source</h2>
           <p class="support-desc">
-            Glyph is completely free, open source (GPL-3.0), and developed with passion for the Linux community. If you enjoy reading with Glyph, consider supporting ongoing development!
+            Glyph is completely free, open source (GPL-3.0), and developed with passion for the Linux desktop community. If you enjoy customizing your system with Glyph, consider supporting ongoing development!
           </p>
           <div class="support-buttons">
             <a href="https://ko-fi.com/the0megastar" target="_blank" rel="noopener noreferrer" class="btn btn-kofi" style="font-size: 1.05rem; padding: 14px 30px;">
