@@ -92,6 +92,56 @@ def set_icon_value(text: str, value: str) -> str:
     return "".join(out)
 
 
+def get_name_value(text: str) -> str:
+    in_entry = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            in_entry = stripped == "[Desktop Entry]"
+            continue
+        if in_entry and stripped.startswith("Name="):
+            return stripped.split("=", 1)[1].strip()
+    return ""
+
+
+def set_name_value(text: str, value: str) -> str:
+    lines = text.splitlines(keepends=True)
+    if lines and not lines[-1].endswith("\n"):
+        lines[-1] += "\n"
+
+    in_entry = False
+    found = False
+    out: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            in_entry = stripped == "[Desktop Entry]"
+            out.append(line if line.endswith("\n") else line + "\n")
+            continue
+        if in_entry and stripped.startswith("Name=") and not found:
+            out.append(f"Name={value}\n")
+            found = True
+            continue
+        # Strip localized names so custom name is always used
+        if in_entry and stripped.startswith("Name["):
+            continue
+        out.append(line if line.endswith("\n") else line + "\n")
+
+    if not found:
+        inserted = False
+        rebuilt: list[str] = []
+        for line in out:
+            rebuilt.append(line)
+            if not inserted and line.strip() == "[Desktop Entry]":
+                rebuilt.append(f"Name={value}\n")
+                inserted = True
+        out = rebuilt
+        if not inserted:
+            out.insert(0, "[Desktop Entry]\n")
+            out.insert(1, f"Name={value}\n")
+    return "".join(out)
+
+
 def _local_path_for(source: Path) -> Path:
     return APPLICATIONS_DIR / source.name
 
@@ -119,6 +169,16 @@ def _unlink_glyph_icon(path: Path | None) -> None:
 def refresh_desktop_database(path: Path | None = None) -> None:
     target = path or APPLICATIONS_DIR
     target.mkdir(parents=True, exist_ok=True)
+    if Path("/.flatpak-info").exists():
+        try:
+            subprocess.run(
+                ["flatpak-spawn", "--host", "update-desktop-database", str(target)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except Exception:
+            pass
     try:
         subprocess.run(
             ["update-desktop-database", str(target)],
@@ -170,18 +230,18 @@ def apply_icon(desktop_id: str, source_desktop: str, image_path: str) -> dict:
     os.utime(local, None)
 
     state = load_state()
-    previous = state.get(desktop_id, {})
-    old_icon = previous.get("icon_path")
+    record = state.get(desktop_id, {})
+    old_icon = record.get("icon_path")
     if old_icon and old_icon != str(dest_icon):
         _unlink_glyph_icon(Path(old_icon))
 
-    record = {
+    record.update({
         "created_local": created_local,
         "icon_path": str(dest_icon),
         "local_desktop": str(local),
         "original_icon": original_icon,
         "source_path": source_path,
-    }
+    })
     state[desktop_id] = record
     save_state(state)
     refresh_desktop_database()
@@ -191,25 +251,116 @@ def apply_icon(desktop_id: str, source_desktop: str, image_path: str) -> dict:
 def revert_icon(desktop_id: str) -> None:
     state = load_state()
     record = state.get(desktop_id)
-    if not record:
-        raise OverrideError("No Glyph override for this app.")
+    if not record or not record.get("icon_path"):
+        raise OverrideError("No custom icon override for this app.")
 
     local = Path(record["local_desktop"])
     created_local = bool(record.get("created_local"))
+    has_custom_name = bool(record.get("custom_name"))
 
-    if created_local:
+    if not has_custom_name and created_local:
         if local.is_file():
             local.unlink()
-    elif local.is_file():
+        if record.get("icon_path"):
+            _unlink_glyph_icon(Path(record["icon_path"]))
+        del state[desktop_id]
+    else:
+        if local.is_file():
+            text = local.read_text(encoding="utf-8")
+            original = record.get("original_icon", "")
+            local.write_text(set_icon_value(text, original), encoding="utf-8")
+            os.utime(local, None)
+        if record.get("icon_path"):
+            _unlink_glyph_icon(Path(record["icon_path"]))
+        record.pop("icon_path", None)
+        record.pop("original_icon", None)
+        if not has_custom_name:
+            del state[desktop_id]
+        else:
+            state[desktop_id] = record
+
+    save_state(state)
+    refresh_desktop_database()
+
+
+def apply_name(desktop_id: str, source_desktop: str, new_name: str) -> dict:
+    new_name = new_name.strip()
+    if not new_name:
+        raise OverrideError("App name cannot be empty.")
+
+    if not source_desktop:
+        raise OverrideError("This app has no desktop file to override.")
+
+    source = Path(source_desktop)
+    if not source.is_file():
+        raise OverrideError(f"Desktop file not found: {source}")
+
+    _ensure_dirs()
+    local = _local_path_for(source)
+    created_local = not local.exists()
+
+    state = load_state()
+    record = state.get(desktop_id, {})
+
+    if created_local:
+        shutil.copy2(source, local)
         text = local.read_text(encoding="utf-8")
-        original = record.get("original_icon", "")
-        local.write_text(set_icon_value(text, original), encoding="utf-8")
-        os.utime(local, None)
+        original_name = get_name_value(text)
+        source_path = str(source)
+    else:
+        text = local.read_text(encoding="utf-8")
+        original_name = record.get("original_name")
+        if not original_name:
+            if source.is_file():
+                original_name = get_name_value(source.read_text(encoding="utf-8"))
+            else:
+                original_name = get_name_value(text)
+        source_path = record.get("source_path", str(source))
+        created_local = bool(record.get("created_local", False))
 
-    if record.get("icon_path"):
-        _unlink_glyph_icon(Path(record["icon_path"]))
+    local.write_text(set_name_value(text, new_name), encoding="utf-8")
+    os.utime(local, None)
 
-    del state[desktop_id]
+    record.update({
+        "created_local": created_local,
+        "custom_name": new_name,
+        "local_desktop": str(local),
+        "original_name": original_name,
+        "source_path": source_path,
+    })
+    state[desktop_id] = record
+    save_state(state)
+    refresh_desktop_database()
+    return record
+
+
+def revert_name(desktop_id: str) -> None:
+    state = load_state()
+    record = state.get(desktop_id)
+    if not record or not record.get("custom_name"):
+        raise OverrideError("No custom name override for this app.")
+
+    local = Path(record["local_desktop"])
+    created_local = bool(record.get("created_local"))
+    has_custom_icon = bool(record.get("icon_path"))
+
+    if not has_custom_icon and created_local:
+        if local.is_file():
+            local.unlink()
+        del state[desktop_id]
+    else:
+        if local.is_file():
+            text = local.read_text(encoding="utf-8")
+            original = record.get("original_name", "")
+            local.write_text(set_name_value(text, original), encoding="utf-8")
+            os.utime(local, None)
+        record.pop("custom_name", None)
+        record.pop("original_name", None)
+        if not has_custom_icon:
+            del state[desktop_id]
+        else:
+            state[desktop_id] = record
+
     save_state(state)
     refresh_desktop_database()
 
@@ -236,10 +387,42 @@ def revert_all_icons() -> int:
     count = 0
     for desktop_id in list(state.keys()):
         try:
-            revert_icon(desktop_id)
+            restore_stock_launcher(desktop_id)
             count += 1
         except Exception:
             pass
+    return count
+
+
+def restore_all_to_stock() -> int:
+    from glyph.catalog import find_stock_desktop_file
+
+    _ensure_dirs()
+    count = 0
+
+    # Remove all local .desktop files in ~/.local/share/applications/ that shadow a system package
+    if APPLICATIONS_DIR.is_dir():
+        for item in list(APPLICATIONS_DIR.glob("*.desktop")):
+            if not item.is_file():
+                continue
+            stock = find_stock_desktop_file(item.name)
+            if stock:
+                try:
+                    if Path(stock).resolve() != item.resolve():
+                        item.unlink()
+                        count += 1
+                except OSError:
+                    pass
+
+    # Clean up all Glyph icons and clear state
+    state = load_state()
+    for record in state.values():
+        icon_path = record.get("icon_path")
+        if icon_path:
+            _unlink_glyph_icon(Path(icon_path))
+
+    save_state({})
+    refresh_desktop_database()
     return count
 
 

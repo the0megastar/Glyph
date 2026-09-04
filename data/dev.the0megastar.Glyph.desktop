@@ -8,4 +8,5 @@ Type=Application
 Categories=Settings;DesktopSettings;
 Keywords=icon;desktop;launcher;theme;
 StartupNotify=true
+StartupWMClass=dev.the0megastar.Glyph
 DBusActivatable=false

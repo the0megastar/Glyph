@@ -1,9 +1,18 @@
 from pathlib import Path
+import subprocess
 
 from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
 
 from glyph.catalog import AppEntry, list_apps
-from glyph.overrides import OverrideError, apply_icon, load_state, restore_stock_launcher, revert_icon
+from glyph.overrides import (
+    OverrideError,
+    apply_icon,
+    apply_name,
+    load_state,
+    restore_stock_launcher,
+    revert_icon,
+    revert_name,
+)
 
 
 def _image_from_gicon(gicon: Gio.Icon | None, pixel_size: int) -> Gtk.Image:
@@ -21,16 +30,18 @@ def _primary_menu_button() -> Gtk.MenuButton:
 
     overrides_section = Gio.Menu()
     overrides_section.append("Revert All Custom Icons…", "app.revert-all")
+    overrides_section.append("Restore All to System Default…", "app.restore-all-stock")
     overrides_section.append("Export Overrides…", "app.export-overrides")
     overrides_section.append("Restore Overrides…", "app.import-overrides")
     overrides_section.append("Open Data Folder in Files", "app.open-data-folder")
     menu.append_section(None, overrides_section)
 
     help_section = Gio.Menu()
-    help_section.append("How to refresh icons", "app.refresh-help")
+    help_section.append("How to Refresh Icons…", "app.refresh-help")
     menu.append_section(None, help_section)
 
     about_section = Gio.Menu()
+    about_section.append("Keyboard Shortcuts", "app.shortcuts")
     about_section.append("About Glyph", "app.about")
     menu.append_section(None, about_section)
 
@@ -112,7 +123,18 @@ class GlyphWindow(Adw.ApplicationWindow):
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_vexpand(True)
         scrolled.set_child(clamp)
-        toolbar.set_content(scrolled)
+
+        self._stack = Gtk.Stack()
+        self._stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self._stack.add_named(scrolled, "list")
+
+        self._empty_page = Adw.StatusPage()
+        self._empty_page.set_icon_name("system-search-symbolic")
+        self._empty_page.set_title("No Applications Found")
+        self._empty_page.set_description("Try a different search term or clear the filter.")
+        self._stack.add_named(self._empty_page, "empty")
+
+        toolbar.set_content(self._stack)
 
         return Adw.NavigationPage(title="Glyph", child=toolbar)
 
@@ -123,6 +145,7 @@ class GlyphWindow(Adw.ApplicationWindow):
         if self._detail_id and getattr(self, "_detail_page", None) is not None:
             app = self._find(self._detail_id)
             if app is not None:
+                self._detail_page.set_title(app.name)
                 self._fill_detail(app)
 
     def _update_filter_menu(self) -> None:
@@ -170,15 +193,17 @@ class GlyphWindow(Adw.ApplicationWindow):
             visible += 1
 
         if visible == 0:
-            empty = Adw.ActionRow()
-            if custom_only:
-                empty.set_title("No customized applications")
-                empty.set_subtitle("Applications with custom icons will appear here.")
+            if custom_only and not query:
+                self._empty_page.set_icon_name("starred-symbolic")
+                self._empty_page.set_title("No Customized Applications")
+                self._empty_page.set_description("You haven't customized any app icons or names yet.")
             else:
-                empty.set_title("No applications found")
-                empty.set_subtitle("Try a different search.")
-            empty.set_sensitive(False)
-            self.listbox.append(empty)
+                self._empty_page.set_icon_name("system-search-symbolic")
+                self._empty_page.set_title("No Applications Found")
+                self._empty_page.set_description("Try a different search term or clear the filter.")
+            self._stack.set_visible_child_name("empty")
+        else:
+            self._stack.set_visible_child_name("list")
 
     def _make_row(self, app: AppEntry) -> Adw.ActionRow:
         row = Adw.ActionRow()
@@ -226,38 +251,80 @@ class GlyphWindow(Adw.ApplicationWindow):
         box.set_margin_start(18)
         box.set_margin_end(18)
 
-        hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         hero.set_halign(Gtk.Align.CENTER)
 
-        self._icon_host = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self._icon_host = Gtk.Overlay()
         self._icon_host.set_halign(Gtk.Align.CENTER)
-        self._icon_host.set_tooltip_text("Drop an image here or click 'Change icon'")
+
+        self._icon_button = Gtk.Button()
+        self._icon_button.add_css_class("flat")
+        self._icon_button.connect("clicked", self._on_change)
+        self._icon_button.set_tooltip_text("Click or drop an image to change icon")
+
         self._detail_icon = _image_from_gicon(app.gicon, 96)
-        self._icon_host.append(self._detail_icon)
+        self._icon_button.set_child(self._detail_icon)
+        self._icon_host.set_child(self._icon_button)
+
+        edit_icon = Gtk.Image.new_from_icon_name("document-edit-symbolic")
+        edit_icon.set_pixel_size(14)
+        badge_btn = Gtk.Button()
+        badge_btn.set_child(edit_icon)
+        badge_btn.add_css_class("circular")
+        badge_btn.add_css_class("raised")
+        badge_btn.set_halign(Gtk.Align.END)
+        badge_btn.set_valign(Gtk.Align.END)
+        badge_btn.set_tooltip_text("Change icon")
+        badge_btn.connect("clicked", self._on_change)
+        self._icon_host.add_overlay(badge_btn)
 
         drop_target = Gtk.DropTarget.new(Gio.File, Gdk.DragAction.COPY)
         drop_target.connect("drop", self._on_icon_dropped)
         self._icon_host.add_controller(drop_target)
         hero.append(self._icon_host)
 
+        icon_hint = Gtk.Label(label="Click or drop image · PNG, SVG, WebP, JPG")
+        icon_hint.add_css_class("caption")
+        icon_hint.add_css_class("dim-label")
+        hero.append(icon_hint)
+
+        title_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        title_box.set_halign(Gtk.Align.CENTER)
+        title_box.set_margin_top(4)
+
         self._detail_title = Gtk.Label(label=app.name)
         self._detail_title.add_css_class("title-1")
         self._detail_title.set_wrap(True)
         self._detail_title.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
-        hero.append(self._detail_title)
+        title_box.append(self._detail_title)
 
-        self._detail_source = Gtk.Label()
-        self._detail_source.add_css_class("dim-label")
-        hero.append(self._detail_source)
+        self._name_edit_btn = Gtk.Button(icon_name="document-edit-symbolic")
+        self._name_edit_btn.add_css_class("flat")
+        self._name_edit_btn.add_css_class("circular")
+        self._name_edit_btn.set_valign(Gtk.Align.CENTER)
+        self._name_edit_btn.set_tooltip_text("Rename application")
+        self._name_edit_btn.connect("clicked", self._on_edit_name_clicked)
+        title_box.append(self._name_edit_btn)
 
-        change = Gtk.Button(label="Change icon")
-        change.add_css_class("suggested-action")
-        change.add_css_class("pill")
-        change.connect("clicked", self._on_change)
-        hero.append(change)
+        self._name_reset_btn = Gtk.Button(icon_name="edit-undo-symbolic")
+        self._name_reset_btn.add_css_class("flat")
+        self._name_reset_btn.add_css_class("circular")
+        self._name_reset_btn.set_valign(Gtk.Align.CENTER)
+        self._name_reset_btn.set_tooltip_text("Reset to original name")
+        self._name_reset_btn.set_visible(False)
+        self._name_reset_btn.connect("clicked", self._on_name_reset)
+        title_box.append(self._name_reset_btn)
+
+        hero.append(title_box)
+
+        self._badge_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self._badge_box.set_halign(Gtk.Align.CENTER)
+        hero.append(self._badge_box)
+
         box.append(hero)
 
         group = Adw.PreferencesGroup()
+
         self._desktop_file_row = Adw.ActionRow(title="Desktop file")
         self._desktop_file_row.set_subtitle_lines(2)
         self._open_desktop_file = Gtk.Button(icon_name="folder-open-symbolic")
@@ -280,6 +347,15 @@ class GlyphWindow(Adw.ApplicationWindow):
 
         self._command_row = Adw.ActionRow(title="Command")
         self._command_row.set_subtitle_lines(3)
+        self._command_row.set_activatable(True)
+        self._command_row.connect("activated", self._on_launch)
+
+        self._launch_btn = Gtk.Button(icon_name="media-playback-start-symbolic")
+        self._launch_btn.add_css_class("flat")
+        self._launch_btn.set_valign(Gtk.Align.CENTER)
+        self._launch_btn.set_tooltip_text("Launch application")
+        self._launch_btn.connect("clicked", self._on_launch)
+        self._command_row.add_suffix(self._launch_btn)
         group.add(self._command_row)
         box.append(group)
 
@@ -295,7 +371,7 @@ class GlyphWindow(Adw.ApplicationWindow):
 
         self._stock_button = Gtk.Button(label="Restore system default launcher")
         self._stock_button.add_css_class("pill")
-        self._stock_button.set_tooltip_text("Remove local override and restore system default launcher")
+        self._stock_button.set_tooltip_text("Restore the original stock name and icon provided by the package install")
         self._stock_button.connect("clicked", self._on_restore_stock)
         self._bottom_box.append(self._stock_button)
 
@@ -314,34 +390,111 @@ class GlyphWindow(Adw.ApplicationWindow):
         return self._detail_page
 
     def _fill_detail(self, app: AppEntry) -> None:
-        if hasattr(self, "_icon_host"):
-            self._icon_host.remove(self._detail_icon)
+        if hasattr(self, "_icon_button"):
             self._detail_icon = _image_from_gicon(app.gicon, 96)
-            self._icon_host.append(self._detail_icon)
+            self._icon_button.set_child(self._detail_icon)
         self._detail_title.set_label(app.name)
+        self._name_reset_btn.set_visible(app.custom_name)
 
-        subtitle = app.source
         is_shadowed = (
             app.has_stock
             and bool(app.stock_filename)
             and bool(app.filename)
             and Path(app.filename).resolve() != Path(app.stock_filename).resolve()
         )
-        if app.custom:
-            subtitle += " · custom icon"
-        elif is_shadowed:
-            subtitle += " · local override"
-        self._detail_source.set_label(subtitle)
 
-        self._revert_button.set_visible(app.custom)
+        while child := self._badge_box.get_first_child():
+            self._badge_box.remove(child)
+
+        source_lbl = Gtk.Label(label=app.source)
+        source_lbl.add_css_class("caption")
+        source_lbl.add_css_class("dim-label")
+        self._badge_box.append(source_lbl)
+
+        if app.custom_icon:
+            icon_lbl = Gtk.Label(label="·  Custom Icon")
+            icon_lbl.add_css_class("caption")
+            icon_lbl.add_css_class("accent")
+            self._badge_box.append(icon_lbl)
+
+        if app.custom_name:
+            name_lbl = Gtk.Label(label="·  Custom Name")
+            name_lbl.add_css_class("caption")
+            name_lbl.add_css_class("accent")
+            self._badge_box.append(name_lbl)
+
+        if is_shadowed and not app.custom_icon and not app.custom_name:
+            shadow_lbl = Gtk.Label(label="·  Override")
+            shadow_lbl.add_css_class("caption")
+            shadow_lbl.add_css_class("dim-label")
+            self._badge_box.append(shadow_lbl)
+
+        self._revert_button.set_visible(app.custom_icon)
         self._stock_button.set_visible(is_shadowed)
-        self._bottom_box.set_visible(app.custom or is_shadowed)
+        self._bottom_box.set_visible(app.custom_icon or is_shadowed)
 
         self._desktop_file_row.set_subtitle(app.filename or "No desktop file")
         self._open_desktop_file.set_sensitive(bool(app.filename))
         self._app_folder_row.set_subtitle(app.app_folder or "Unknown")
-        self._open_app_folder.set_sensitive(bool(app.app_folder))
+        can_launch = bool(app.command or app.filename)
         self._command_row.set_subtitle(app.command or "No command")
+        self._command_row.set_activatable(can_launch)
+        self._launch_btn.set_sensitive(can_launch)
+
+    def _on_edit_name_clicked(self, _widget: object) -> None:
+        if not self._detail_id:
+            return
+        app = self._find(self._detail_id)
+        if app is None:
+            return
+
+        dialog = Adw.AlertDialog(
+            heading=f"Rename {app.name}",
+            body="Enter a new display name for this application.",
+        )
+        entry = Gtk.Entry(text=app.name)
+        entry.set_activates_default(True)
+        dialog.set_extra_child(entry)
+
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("rename", "Rename")
+        dialog.set_response_appearance("rename", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("rename")
+        dialog.set_close_response("cancel")
+
+        def on_response(_d, response):
+            if response == "rename":
+                new_name = entry.get_text().strip()
+                if not new_name:
+                    self._toast("Display name cannot be empty.")
+                    return
+                if new_name == app.name:
+                    return
+                source_desktop = app.filename or app.stock_filename
+                if not source_desktop:
+                    self._toast("No desktop file found to override.")
+                    return
+                try:
+                    apply_name(app.desktop_id, source_desktop, new_name)
+                except OverrideError as exc:
+                    self._toast(str(exc))
+                    return
+                self.reload()
+                self._toast("Display name saved. Log out to refresh the app grid.")
+
+        dialog.connect("response", on_response)
+        dialog.present(self)
+
+    def _on_name_reset(self, _button: Gtk.Button) -> None:
+        if not self._detail_id:
+            return
+        try:
+            revert_name(self._detail_id)
+        except OverrideError as exc:
+            self._toast(str(exc))
+            return
+        self.reload()
+        self._toast("Original display name restored.")
 
     def _on_icon_dropped(self, _target: Gtk.DropTarget, value: object, _x: float, _y: float) -> bool:
         if not self._detail_id or not isinstance(value, Gio.File):
@@ -410,24 +563,70 @@ class GlyphWindow(Adw.ApplicationWindow):
         if app is None:
             return
         dialog = Adw.AlertDialog(
-            heading=f"Restore system default for {app.name}?",
+            heading=f"Restore default launcher for {app.name}?",
             body=(
-                f"This will remove the local override ({app.filename}) "
-                f"and restore the system default launcher ({app.stock_filename})."
+                "This will remove your local overrides and restore the application "
+                "to its original stock name and icon as provided by the package install."
             ),
         )
         dialog.add_response("cancel", "Cancel")
-        dialog.add_response("restore", "Restore Stock")
+        dialog.add_response("restore", "Restore Default")
         dialog.set_response_appearance("restore", Adw.ResponseAppearance.DESTRUCTIVE)
 
         def on_response(_d, response):
             if response == "restore":
                 restore_stock_launcher(app.desktop_id)
                 self.reload()
-                self._toast(f"Restored system default for {app.name}.")
+                self._toast(f"Restored default launcher for {app.name}.")
 
         dialog.connect("response", on_response)
         dialog.present(self)
+
+    def _on_launch(self, _button: Gtk.Button) -> None:
+        if not self._detail_id:
+            return
+        app = self._find(self._detail_id)
+        if app is None:
+            return
+
+        if Path("/.flatpak-info").exists():
+            target_id = app.desktop_id
+            if not target_id and app.filename:
+                target_id = Path(app.filename).name
+            try:
+                subprocess.Popen(
+                    ["flatpak-spawn", "--host", "gtk-launch", target_id],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                self._toast(f"Launched {app.name}.")
+                return
+            except Exception:
+                try:
+                    subprocess.Popen(
+                        ["flatpak-spawn", "--host", "gio", "launch", app.filename or app.desktop_id],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    self._toast(f"Launched {app.name}.")
+                    return
+                except Exception as exc:
+                    self._toast(f"Failed to launch on host: {exc}")
+                    return
+
+        info = Gio.DesktopAppInfo.new(app.desktop_id)
+        if not info and app.filename:
+            info = Gio.DesktopAppInfo.new_from_filename(app.filename)
+        if not info and app.stock_filename:
+            info = Gio.DesktopAppInfo.new_from_filename(app.stock_filename)
+        if not info:
+            self._toast("Could not create launcher.")
+            return
+        try:
+            info.launch([], None)
+            self._toast(f"Launched {app.name}.")
+        except Exception as exc:
+            self._toast(f"Failed to launch: {exc}")
 
     def _on_open_desktop_file(self, _button: Gtk.Button) -> None:
         if not self._detail_id:

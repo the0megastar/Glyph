@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.the0megastar.Glyph</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <name>Glyph</name>
+  <summary>Change and restore application icons</summary>
+
+  <description>
+    <p>
+      Glyph is an intuitive, modern desktop utility for Linux that allows you to easily customize application icons across your system without requiring root permissions.
+    </p>
+    <p>Key features include:</p>
+    <ul>
+      <li>Browse and search through all installed desktop applications</li>
+      <li>Set custom app icons from local SVG or PNG files</li>
+      <li>Safely manage overrides at the user level without touching system files</li>
+      <li>Instant one-click restore back to default system icons</li>
+      <li>Test launch applications directly to verify changes</li>
+      <li>Clean, adaptive design built with GTK4 and Libadwaita</li>
+    </ul>
+  </description>
+
+  <developer id="dev.the0megastar">
+    <name>the0megastar</name>
+  </developer>
+
+  <launchable type="desktop-id">dev.the0megastar.Glyph.desktop</launchable>
+
+  <url type="homepage">https://the0megastar.github.io/Glyph</url>
+  <url type="bugtracker">https://github.com/the0megastar/Glyph/issues</url>
+  <url type="vcs-browser">https://github.com/the0megastar/Glyph</url>
+  <url type="donation">https://ko-fi.com/the0megastar</url>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Browse installed applications</caption>
+      <image>https://raw.githubusercontent.com/the0megastar/Glyph/main/data/screenshots/library.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Customize application icon and details</caption>
+      <image>https://raw.githubusercontent.com/the0megastar/Glyph/main/data/screenshots/detail.png</image>
+    </screenshot>
+  </screenshots>
+
+  <releases>
+    <release version="0.1.0" date="2026-09-03">
+      <description>
+        <p>Initial public release:</p>
+        <ul>
+          <li>Browse and search installed apps</li>
+          <li>Set custom icons from SVG or PNG</li>
+          <li>Safe user-level icon overrides</li>
+          <li>One-click restore to system defaults</li>
+          <li>Direct application test-launch</li>
+          <li>Native Libadwaita dark mode design</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+
+  <content_rating type="oars-1.1" />
+
+  <categories>
+    <category>Utility</category>
+    <category>DesktopSettings</category>
+    <category>Settings</category>
+  </categories>
+
+  <keywords>
+    <keyword>icon</keyword>
+    <keyword>desktop</keyword>
+    <keyword>theme</keyword>
+    <keyword>launcher</keyword>
+    <keyword>customize</keyword>
+  </keywords>
+</component>
