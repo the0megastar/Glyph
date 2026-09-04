@@ -110,36 +110,13 @@ meson compile -C build
 meson devenv -C build python3 -m glyph
 ```
 
-## Flatpak Packaging
+## Flatpak
 
-Glyph includes a Flatpak manifest (`dev.the0megastar.Glyph.yaml`) targeting the GNOME 49 runtime (`org.gnome.Platform` / `org.gnome.Sdk`).
+Glyph can be built and run as a sandboxed Flatpak using the included manifest (`dev.the0megastar.Glyph.yaml`).
 
-### Local Build & Test
-
-Install `flatpak-builder` on your host:
-
-```bash
-sudo dnf install flatpak-builder
-```
-
-Build and install Glyph into your local user Flatpak repository:
+### Building with Flatpak Builder
 
 ```bash
 flatpak-builder --user --install --force-clean build-flatpak dev.the0megastar.Glyph.yaml
-```
-
-Run the sandboxed Flatpak:
-
-```bash
 flatpak run dev.the0megastar.Glyph
 ```
-
-### Submitting to Flathub
-
-1. Fork the [flathub/flathub](https://github.com/flathub/flathub) repository on GitHub.
-2. Create a new branch: `git checkout -b add-glyph`.
-3. Add `dev.the0megastar.Glyph.yaml` to the root (pointing to your release archive/tag on GitHub).
-4. Open a Pull Request on GitHub against `flathub/flathub:new-pr`.
-5. Once merged, Flathub's build bots will build the package and publish Glyph to Flathub automatically!
-
-
