@@ -319,6 +319,18 @@ body {
   transform: translateY(-2px);
 }
 
+.btn-sponsor {
+  background: rgba(234, 74, 170, 0.12);
+  border-color: rgba(234, 74, 170, 0.3);
+  color: #ea4aaa;
+}
+
+.btn-sponsor:hover {
+  background: rgba(234, 74, 170, 0.22);
+  border-color: #ea4aaa;
+  transform: translateY(-2px);
+}
+
 /* Command Snippet Box */
 .command-box {
   display: inline-flex;
@@ -661,13 +673,28 @@ body {
 }
 
 .support-banner {
-  background: radial-gradient(circle at 50% 50%, rgba(120, 82, 255, 0.15) 0%, rgba(20, 25, 35, 0.8) 100%);
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-xl);
-  padding: 60px 30px;
-  max-width: 860px;
+  padding: 56px 36px;
+  max-width: 840px;
   margin: 0 auto;
   box-shadow: var(--card-shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.support-banner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: var(--accent-gradient);
+  border-radius: var(--radius-full);
 }
 
 .support-title {
