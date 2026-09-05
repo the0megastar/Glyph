@@ -104,7 +104,7 @@ async function fetchLatestRelease() {
     if (data && data.tag_name) {
       const versionPill = document.querySelector('.version-pill');
       if (versionPill) {
-        versionPill.innerHTML = `<span class="status-dot" aria-hidden="true"></span> ${data.tag_name} • Native GTK4 & Libadwaita`;
+        versionPill.textContent = `${data.tag_name} • Native GTK4 & Libadwaita`;
       }
     }
   } catch {
