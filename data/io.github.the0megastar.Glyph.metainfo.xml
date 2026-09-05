@@ -45,6 +45,18 @@
   </screenshots>
 
   <releases>
+    <release version="0.1.2" date="2026-09-05">
+      <description>
+        <p>Hardened Flatpak permissions and least-privilege compliance:</p>
+        <ul>
+          <li>Scoped Flatpak system and user directory access strictly to exports and app directories</li>
+          <li>Removed broad host filesystem access for Flathub sandbox compliance</li>
+          <li>Relied on default sandboxed storage for custom icons without extra filesystem permissions</li>
+          <li>Preserved granular user launcher overrides in ~/.local/share/applications</li>
+          <li>Maintained read-only access for user icon themes in ~/.local/share/icons</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.1" date="2026-09-05">
       <description>
         <p>Hardened Flatpak sandbox, strict file permissions, and GNOME 50:</p>

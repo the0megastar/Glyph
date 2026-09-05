@@ -234,13 +234,13 @@ class GlyphApplication(Adw.Application):
             designers=["the0megastar"],
             release_notes_version=__version__,
             release_notes=(
-                "<p>Hardened Flatpak sandbox, strict file permissions, and GNOME 50:</p>"
+                "<p>Hardened Flatpak permissions and least-privilege compliance:</p>"
                 "<ul>"
-                "<li>Updated base platform and SDK runtime to GNOME 50</li>"
-                "<li>Hardened Flatpak sandbox: replaced overreaching host:ro with scoped host-os:ro, isolating /home and user files completely</li>"
-                "<li>Strict granular permissions: restricted write access solely to user overrides (~/.local/share/applications) and custom icons (~/.local/share/glyph)</li>"
-                "<li>Added read-only access for user icon themes (xdg-data/icons:ro)</li>"
-                "<li>Enhanced host application catalog and icon discovery inside the sandbox via /run/host/usr</li>"
+                "<li>Scoped Flatpak directory access strictly to exports/share and app paths</li>"
+                "<li>Removed broad host filesystem access for Flathub sandbox compliance</li>"
+                "<li>Relied on default sandboxed storage for custom icons without extra filesystem permissions</li>"
+                "<li>Preserved granular user launcher overrides in ~/.local/share/applications</li>"
+                "<li>Maintained read-only access for user icon themes in ~/.local/share/icons</li>"
                 "</ul>"
             ),
         )
