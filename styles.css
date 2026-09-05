@@ -1064,53 +1064,6 @@ button.dropdown-item {
   font-size: 0.92rem;
 }
 
-/* Past Releases Collapsible */
-.past-releases-details {
-  max-width: 780px;
-  margin: 0 auto;
-}
-
-.past-releases-summary {
-  cursor: pointer;
-  user-select: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-card);
-  border-radius: var(--radius-md);
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  transition: all 0.2s ease;
-}
-
-.past-releases-summary:hover {
-  color: var(--text-main);
-  border-color: var(--border-highlight);
-}
-
-.past-releases-summary::-webkit-details-marker {
-  display: none;
-}
-
-.past-releases-chevron {
-  transition: transform 0.2s ease;
-}
-
-.past-releases-details[open] .past-releases-chevron {
-  transform: rotate(180deg);
-}
-
-.past-releases-content {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-
 /* Support Section - Clean Native Card */
 .support-section {
   padding: 50px 0 80px;
