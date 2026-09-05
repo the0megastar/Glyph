@@ -362,11 +362,12 @@
         </div>
 
         <div class="install-grid">
-          <!-- Option 1: Quick Run from Source (Available Now) -->
-          <div class="install-card install-card-primary">
-            <div class="install-card-badge">Available Now</div>
-            <div class="install-card-icon">⚡</div>
-            <h3 class="install-card-title">Run Instantly from Source</h3>
+          <!-- Option 1: Quick Run from Source -->
+          <div class="install-card">
+            <div class="install-card-header">
+              <span class="install-card-icon">⚡</span>
+              <h3 class="install-card-title">Run Instantly from Source</h3>
+            </div>
             <p class="install-card-desc">
               Zero compilation required. Clone and launch directly with Python 3, GTK4, and Libadwaita:
             </p>
@@ -380,16 +381,14 @@
                 <span id="copyBtnLabel">Copy</span>
               </button>
             </div>
-            <div class="install-card-meta">
-              <span>Runs entirely in user space • No root permissions needed</span>
-            </div>
           </div>
 
           <!-- Option 2: Arch Linux & Source Prefix Build -->
           <div class="install-card" id="archInstallCard">
-            <div class="install-card-badge">Arch Linux Setup</div>
-            <div class="install-card-icon">🏔️</div>
-            <h3 class="install-card-title">Arch Linux &amp; User Prefix</h3>
+            <div class="install-card-header">
+              <span class="install-card-icon">🏔️</span>
+              <h3 class="install-card-title">Arch Linux &amp; User Prefix</h3>
+            </div>
             <p class="install-card-desc">
               While AUR maintainer registrations are temporarily closed, build directly into your user prefix:
             </p>
@@ -402,9 +401,6 @@
                 </svg>
                 <span id="archCopyBtnLabel">Copy</span>
               </button>
-            </div>
-            <div class="install-card-meta">
-              <span>Arch AUR package pending • Standard ~/.local installation</span>
             </div>
           </div>
         </div>
