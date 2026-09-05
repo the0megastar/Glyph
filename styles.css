@@ -954,6 +954,7 @@ button.dropdown-item {
   padding-left: 24px;
   color: var(--text-muted);
   font-size: 0.96rem;
+  line-height: 1.55;
 }
 
 .release-notes-list li::before {
@@ -963,6 +964,152 @@ button.dropdown-item {
   color: #2ec27e;
   font-weight: 700;
 }
+
+.release-subheading {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 22px 0 10px;
+}
+
+.release-paragraph {
+  color: var(--text-muted);
+  font-size: 0.96rem;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.release-github-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-card);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  transition: all 0.2s ease;
+}
+
+.release-github-tag:hover {
+  color: var(--text-main);
+  border-color: var(--border-highlight);
+}
+
+/* Release Archive Card */
+.release-archive-card {
+  max-width: 780px;
+  margin: 20px auto 24px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  box-shadow: var(--card-shadow);
+  flex-wrap: wrap;
+}
+
+.release-archive-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 260px;
+}
+
+.release-archive-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.release-archive-title {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.release-archive-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.release-archive-actions {
+  display: flex;
+  align-items: center;
+}
+
+.release-archive-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  padding: 10px 18px;
+  font-size: 0.92rem;
+}
+
+/* Past Releases Collapsible */
+.past-releases-details {
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+.past-releases-summary {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.past-releases-summary:hover {
+  color: var(--text-main);
+  border-color: var(--border-highlight);
+}
+
+.past-releases-summary::-webkit-details-marker {
+  display: none;
+}
+
+.past-releases-chevron {
+  transition: transform 0.2s ease;
+}
+
+.past-releases-details[open] .past-releases-chevron {
+  transform: rotate(180deg);
+}
+
+.past-releases-content {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 
 /* Support Section - Clean Native Card */
 .support-section {

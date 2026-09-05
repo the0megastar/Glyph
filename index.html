@@ -24,7 +24,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=14">
+  <link rel="stylesheet" href="styles.css?v=15">
 </head>
 <body>
   <!-- Sticky HeaderBar / Navbar -->
@@ -104,7 +104,7 @@
         <div class="hero-cta">
           <!-- Split Dropdown Button for Multi-Format Downloads -->
           <div class="split-btn-group" id="downloadSplitGroup">
-            <a href="https://github.com/the0megastar/Glyph/releases/latest/download/Glyph-0.1.1-x86_64.flatpak" class="btn btn-primary split-btn-main" id="primaryDownloadBtn" aria-label="Download for Linux">
+            <a href="https://github.com/the0megastar/Glyph/releases/latest/download/Glyph-0.1.2-x86_64.flatpak" class="btn btn-primary split-btn-main" id="primaryDownloadBtn" aria-label="Download for Linux">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
                 <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
@@ -122,7 +122,7 @@
             <div class="download-dropdown-panel" id="downloadDropdownMenu" role="menu" aria-label="Download options">
               <div class="dropdown-header">Universal Packages (All Distros)</div>
 
-              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/Glyph-0.1.1-x86_64.flatpak" class="dropdown-item" role="menuitem">
+              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/Glyph-0.1.2-x86_64.flatpak" class="dropdown-item" role="menuitem" id="downloadFlatpakX86">
                 <div class="dropdown-item-icon">📦</div>
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">
@@ -134,7 +134,7 @@
                 <span class="dropdown-item-ext">.flatpak</span>
               </a>
 
-              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/Glyph-0.1.1-aarch64.flatpak" class="dropdown-item" role="menuitem">
+              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/Glyph-0.1.2-aarch64.flatpak" class="dropdown-item" role="menuitem" id="downloadFlatpakArm">
                 <div class="dropdown-item-icon">📦</div>
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">Flatpak Bundle (ARM64)</div>
@@ -143,7 +143,7 @@
                 <span class="dropdown-item-ext">.flatpak</span>
               </a>
 
-              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/Glyph-0.1.1.AppImage" class="dropdown-item" role="menuitem">
+              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/Glyph-0.1.2.AppImage" class="dropdown-item" role="menuitem" id="downloadAppImage">
                 <div class="dropdown-item-icon">🚀</div>
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">AppImage</div>
@@ -155,7 +155,7 @@
               <div class="dropdown-divider"></div>
               <div class="dropdown-header">Native Distro Packages</div>
 
-              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/glyph-0.1.1.deb" class="dropdown-item" role="menuitem">
+              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/glyph-0.1.2.deb" class="dropdown-item" role="menuitem" id="downloadDeb">
                 <div class="dropdown-item-icon">📦</div>
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">Debian / Ubuntu / Mint / Pop!_OS</div>
@@ -164,7 +164,7 @@
                 <span class="dropdown-item-ext">.deb</span>
               </a>
 
-              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/glyph-0.1.1.rpm" class="dropdown-item" role="menuitem">
+              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/glyph-0.1.2.rpm" class="dropdown-item" role="menuitem" id="downloadRpm">
                 <div class="dropdown-item-icon">📦</div>
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">Fedora / openSUSE / RHEL</div>
@@ -415,66 +415,124 @@
           <h2 class="section-title">Release Notes</h2>
         </div>
 
-        <!-- Release Card: v0.1.2 (Latest) -->
-        <div class="release-card" style="margin-bottom: 24px;">
+        <!-- Dynamic Latest Release Card (Auto-populated from GitHub API with static fallback) -->
+        <div class="release-card" id="latestReleaseCard" style="margin-bottom: 24px;">
           <div class="release-header">
             <div>
-              <h3 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 700; color: var(--text-main);">Glyph v0.1.2</h3>
-              <span style="font-size: 0.86rem; color: var(--text-dim);">Least-Privilege Scoped Permissions &amp; Flathub Compliance</span>
+              <h3 id="latestReleaseTitle" style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 700; color: var(--text-main);">Glyph v0.1.2</h3>
+              <span id="latestReleaseSubtitle" style="font-size: 0.86rem; color: var(--text-dim);">Latest Release • September 5, 2026</span>
             </div>
-            <span class="release-badge">Latest</span>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span id="latestReleaseBadge" class="release-badge">Latest</span>
+              <a id="latestReleaseGitHubLink" href="https://github.com/the0megastar/Glyph/releases/latest" target="_blank" rel="noopener noreferrer" class="release-github-tag" title="View release on GitHub">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                <span>GitHub</span>
+              </a>
+            </div>
           </div>
 
-          <ul class="release-notes-list">
-            <li><strong>Strict Flatpak Scoping</strong>: Replaced broad filesystem permissions with strictly scoped access to <code>/var/lib/flatpak/exports/share:ro</code> and <code>/var/lib/flatpak/app:ro</code> (and user equivalents). Completely locks out system runtimes, ostree objects, and repo metadata.</li>
-            <li><strong>Default Sandbox Isolation</strong>: Removed explicit host permissions for app state, relying exclusively on private sandboxed storage (<code>XDG_DATA_HOME</code>) for custom icons and backups.</li>
-            <li><strong>Full Host Boundary Protection</strong>: Completely eliminated <code>host:ro</code> and <code>host-os:ro</code> to satisfy Flathub security guidelines and isolate user personal files, documents, and credentials.</li>
-            <li><strong>Granular Launcher Overrides</strong>: Maintained scoped write access solely for user desktop overrides (<code>~/.local/share/applications</code>) and read-only user icon themes (<code>~/.local/share/icons</code>).</li>
-            <li><strong>Multi-Architecture Release Pipeline</strong>: Verified builds across 64-bit PC (<code>x86_64</code>) and ARM64 (<code>aarch64</code>) across Flatpak, AppImage, deb, and rpm packages.</li>
-          </ul>
-        </div>
-
-        <!-- Release Card: v0.1.1 -->
-        <div class="release-card" style="margin-bottom: 24px;">
-          <div class="release-header">
-            <div>
-              <h3 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 700; color: var(--text-main);">Glyph v0.1.1</h3>
-              <span style="font-size: 0.86rem; color: var(--text-dim);">GNOME 50 Runtime &amp; Hardened Sandbox Permissions</span>
-            </div>
-            <span class="release-badge" style="background: rgba(255, 255, 255, 0.08); color: var(--text-muted);">v0.1.1</span>
+          <div id="latestReleaseBody">
+            <ul class="release-notes-list">
+              <li><strong>Strict Flatpak Scoping</strong> - Replaced broad filesystem permissions with strictly scoped access to <code>/var/lib/flatpak/exports/share:ro</code> and <code>/var/lib/flatpak/app:ro</code> (and user equivalents). Completely locks out system runtimes, ostree objects, and repo metadata.</li>
+              <li><strong>Default Sandbox Isolation</strong> - Removed explicit host permissions for app state, relying exclusively on private sandboxed storage (<code>XDG_DATA_HOME</code>) for custom icons and backups.</li>
+              <li><strong>Full Host Boundary Protection</strong> - Completely eliminated <code>host:ro</code> and <code>host-os:ro</code> to satisfy Flathub security guidelines and isolate user personal files, documents, and credentials.</li>
+              <li><strong>Granular Launcher Overrides</strong> - Maintained scoped write access solely for user desktop overrides (<code>~/.local/share/applications</code>) and read-only user icon themes (<code>~/.local/share/icons</code>).</li>
+              <li><strong>Multi-Architecture Release Pipeline</strong> - Verified builds across 64-bit PC (<code>x86_64</code>) and ARM64 (<code>aarch64</code>) across Flatpak, AppImage, deb, and rpm packages.</li>
+            </ul>
           </div>
-
-          <ul class="release-notes-list">
-            <li><strong>Hardened Flatpak Sandbox</strong>: Replaced legacy broad <code>--filesystem=host:ro</code> permission with strictly scoped <code>--filesystem=host-os:ro</code>. Isolates the sandbox completely from the user's home directory, personal files, and credentials.</li>
-            <li><strong>Granular Data Directory Boundaries</strong>: Restricted write access exclusively to user launcher overrides (<code>~/.local/share/applications</code>) and custom icons (<code>~/.local/share/glyph</code>).</li>
-            <li><strong>GNOME 50 Runtime Support</strong>: Upgraded underlying base platform and Flatpak SDK runtime to GNOME 50.</li>
-            <li><strong>Read-Only Theme Access</strong>: Added explicit read-only access for user icon themes (<code>xdg-data/icons:ro</code>) alongside system Flatpak exports.</li>
-            <li><strong>Enhanced Host App Discovery</strong>: Adapted catalog discovery and GTK icon rendering engines to reliably detect native system packages and icons via <code>/run/host/usr</code>.</li>
-          </ul>
         </div>
 
-        <!-- Release Card: v0.1.0 -->
-        <div class="release-card">
-          <div class="release-header">
-            <div>
-              <h3 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 700; color: var(--text-main);">Glyph v0.1.0</h3>
-              <span style="font-size: 0.86rem; color: var(--text-dim);">Initial Beta Release</span>
+        <!-- Release Archive Banner -->
+        <div class="release-archive-card">
+          <div class="release-archive-content">
+            <div class="release-archive-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                <rect x="1" y="3" width="22" height="5"></rect>
+                <line x1="10" y1="12" x2="14" y2="12"></line>
+              </svg>
             </div>
-            <span class="release-badge" style="background: rgba(255, 255, 255, 0.08); color: var(--text-muted);">v0.1.0</span>
+            <div class="release-archive-text">
+              <h3 class="release-archive-title">Looking for earlier releases?</h3>
+              <p class="release-archive-desc">Browse complete release notes, source code assets, and historical packages in the GitHub archive.</p>
+            </div>
           </div>
-
-          <ul class="release-notes-list">
-            <li>Browse and search all installed desktop applications across System, Flatpak, and Snap.</li>
-            <li>Set custom application launcher icons using SVG, PNG, WebP, or JPG files.</li>
-            <li>Drag and drop image files directly onto the app icon preview.</li>
-            <li>Custom application display names with automatic locale stripping and one-click undo.</li>
-            <li>Filter dropdown to view all apps or only customized entries.</li>
-            <li>Safe user-level overrides in <code>~/.local/share/applications</code> without touching system files.</li>
-            <li>One-click revert for individual icons, custom names, or all system defaults.</li>
-            <li>Export and import overrides as <code>.tar.gz</code> bundles for backup and dotfile sync.</li>
-            <li>Native Libadwaita dark and light mode design adhering to GNOME Human Interface Guidelines.</li>
-          </ul>
+          <div class="release-archive-actions">
+            <a href="https://github.com/the0megastar/Glyph/releases" target="_blank" rel="noopener noreferrer" class="btn btn-secondary release-archive-btn">
+              <span>View Release Archive</span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+            </a>
+          </div>
         </div>
+
+        <!-- Collapsible Past Releases Section -->
+        <details class="past-releases-details">
+          <summary class="past-releases-summary">
+            <span>Previous Versions on Site (v0.1.1, v0.1.0)</span>
+            <svg class="past-releases-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </summary>
+          <div class="past-releases-content">
+            <!-- Release Card: v0.1.1 -->
+            <div class="release-card">
+              <div class="release-header">
+                <div>
+                  <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--text-main);">Glyph v0.1.1</h3>
+                  <span style="font-size: 0.86rem; color: var(--text-dim);">GNOME 50 Runtime &amp; Hardened Sandbox Permissions</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span class="release-badge" style="background: rgba(255, 255, 255, 0.08); color: var(--text-muted);">v0.1.1</span>
+                  <a href="https://github.com/the0megastar/Glyph/releases/tag/v0.1.1" target="_blank" rel="noopener noreferrer" class="release-github-tag" title="View release on GitHub">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                    <span>GitHub</span>
+                  </a>
+                </div>
+              </div>
+
+              <ul class="release-notes-list">
+                <li><strong>Hardened Flatpak Sandbox</strong> - Replaced legacy broad <code>--filesystem=host:ro</code> permission with strictly scoped <code>--filesystem=host-os:ro</code>. Isolates the sandbox completely from the user's home directory, personal files, and credentials.</li>
+                <li><strong>Granular Data Directory Boundaries</strong> - Restricted write access exclusively to user launcher overrides (<code>~/.local/share/applications</code>) and custom icons (<code>~/.local/share/glyph</code>).</li>
+                <li><strong>GNOME 50 Runtime Support</strong> - Upgraded underlying base platform and Flatpak SDK runtime to GNOME 50.</li>
+                <li><strong>Read-Only Theme Access</strong> - Added explicit read-only access for user icon themes (<code>xdg-data/icons:ro</code>) alongside system Flatpak exports.</li>
+                <li><strong>Enhanced Host App Discovery</strong> - Adapted catalog discovery and GTK icon rendering engines to reliably detect native system packages and icons via <code>/run/host/usr</code>.</li>
+              </ul>
+            </div>
+
+            <!-- Release Card: v0.1.0 -->
+            <div class="release-card">
+              <div class="release-header">
+                <div>
+                  <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--text-main);">Glyph v0.1.0</h3>
+                  <span style="font-size: 0.86rem; color: var(--text-dim);">Initial Beta Release</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span class="release-badge" style="background: rgba(255, 255, 255, 0.08); color: var(--text-muted);">v0.1.0</span>
+                  <a href="https://github.com/the0megastar/Glyph/releases/tag/v0.1.0" target="_blank" rel="noopener noreferrer" class="release-github-tag" title="View release on GitHub">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                    <span>GitHub</span>
+                  </a>
+                </div>
+              </div>
+
+              <ul class="release-notes-list">
+                <li>Browse and search all installed desktop applications across System, Flatpak, and Snap.</li>
+                <li>Set custom application launcher icons using SVG, PNG, WebP, or JPG files.</li>
+                <li>Drag and drop image files directly onto the app icon preview.</li>
+                <li>Custom application display names with automatic locale stripping and one-click undo.</li>
+                <li>Filter dropdown to view all apps or only customized entries.</li>
+                <li>Safe user-level overrides in <code>~/.local/share/applications</code> without touching system files.</li>
+                <li>One-click revert for individual icons, custom names, or all system defaults.</li>
+                <li>Export and import overrides as <code>.tar.gz</code> bundles for backup and dotfile sync.</li>
+                <li>Native Libadwaita dark and light mode design adhering to GNOME Human Interface Guidelines.</li>
+              </ul>
+            </div>
+          </div>
+        </details>
       </div>
     </section>
 
@@ -527,6 +585,6 @@
   </footer>
 
   <!-- App Script -->
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>
