@@ -377,52 +377,45 @@ body {
 
 /* Showcase Section */
 .showcase-section {
-  padding: 20px 0 80px;
+/* App Store Style Screenshot Gallery */
+.showcase-section {
+  padding: 30px 0 70px;
 }
 
-.showcase-tabs {
-  display: flex;
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 420px));
   justify-content: center;
-  gap: 10px;
-  margin-bottom: 24px;
-}
-
-.tab-btn {
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  padding: 8px 20px;
-  border-radius: var(--radius-full);
-  font-weight: 600;
-  font-size: 0.92rem;
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-.tab-btn:hover {
-  color: var(--text-main);
-  border-color: var(--border-card);
-}
-
-.tab-btn.active {
-  background: var(--accent-primary);
-  color: #ffffff;
-  border-color: transparent;
-}
-
-.window-frame {
-  max-width: 880px;
+  gap: 28px;
+  max-width: 900px;
   margin: 0 auto;
+}
+
+.gallery-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gallery-item .window-frame {
+  width: 100%;
   background: var(--bg-surface);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-card);
-  box-shadow: var(--window-shadow);
+  box-shadow: var(--card-shadow);
   overflow: hidden;
   position: relative;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.gallery-item .window-frame:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-highlight);
+  box-shadow: var(--window-shadow);
 }
 
 .window-header {
-  height: 40px;
+  height: 38px;
   background: var(--bg-surface-elevated);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
@@ -433,12 +426,12 @@ body {
 
 .window-controls {
   display: flex;
-  gap: 8px;
+  gap: 7px;
 }
 
 .window-dot {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
 }
 
@@ -450,25 +443,50 @@ body {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .window-content {
   position: relative;
   line-height: 0;
-  background: #000000;
+  background: #1e1e1e;
 }
 
-.showcase-img {
+.gallery-img {
   width: 100%;
   height: auto;
   display: block;
+  object-fit: contain;
 }
 
-.showcase-img.hidden {
-  display: none;
+.gallery-caption {
+  margin-top: 14px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.gallery-caption-title {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-main);
+}
+
+.gallery-caption-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .gallery-grid {
+    grid-template-columns: minmax(0, 420px);
+    gap: 32px;
+  }
 }
 
 /* Features Grid - Clean Libadwaita Cards */

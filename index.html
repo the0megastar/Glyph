@@ -24,7 +24,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
   <!-- Sticky HeaderBar / Navbar -->
@@ -133,30 +133,50 @@
       </div>
     </section>
 
-    <!-- App Showcase / Screenshots -->
+    <!-- App Showcase / App Store Gallery -->
     <section class="showcase-section" id="showcase">
       <div class="container">
-        <div class="showcase-tabs" role="tablist" aria-label="App screenshot views">
-          <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="view-library" id="tab-library" data-target="library">
-            Applications View
-          </button>
-          <button class="tab-btn" role="tab" aria-selected="false" aria-controls="view-detail" id="tab-reader" data-target="detail">
-            Customization View
-          </button>
-        </div>
-
-        <div class="window-frame">
-          <div class="window-header">
-            <div class="window-controls" aria-hidden="true">
-              <span class="window-dot close"></span>
-              <span class="window-dot min"></span>
-              <span class="window-dot max"></span>
+        <div class="gallery-grid">
+          <!-- Screenshot 1: Library View -->
+          <div class="gallery-item">
+            <div class="window-frame">
+              <div class="window-header">
+                <div class="window-controls" aria-hidden="true">
+                  <span class="window-dot close"></span>
+                  <span class="window-dot min"></span>
+                  <span class="window-dot max"></span>
+                </div>
+                <div class="window-title">Installed Applications</div>
+              </div>
+              <div class="window-content">
+                <img src="assets/library.png" alt="Glyph Applications List View displaying installed system and Flatpak apps with filter and search" class="gallery-img" width="883" height="1024" loading="lazy">
+              </div>
             </div>
-            <div class="window-title" id="windowTitle">Glyph — Installed Applications</div>
+            <div class="gallery-caption">
+              <span class="gallery-caption-title">Applications List</span>
+              <span class="gallery-caption-desc">Browse, search, and filter installed desktop apps</span>
+            </div>
           </div>
-          <div class="window-content">
-            <img src="assets/library.png" alt="Glyph Applications List View displaying installed system and Flatpak apps with filter and search" class="showcase-img" id="img-library" width="1280" height="800">
-            <img src="assets/detail.png" alt="Glyph Customization View showing icon preview, rename tools, desktop file paths, and launch button" class="showcase-img hidden" id="img-detail" width="1280" height="800">
+
+          <!-- Screenshot 2: Detail View -->
+          <div class="gallery-item">
+            <div class="window-frame">
+              <div class="window-header">
+                <div class="window-controls" aria-hidden="true">
+                  <span class="window-dot close"></span>
+                  <span class="window-dot min"></span>
+                  <span class="window-dot max"></span>
+                </div>
+                <div class="window-title">Customize Launcher</div>
+              </div>
+              <div class="window-content">
+                <img src="assets/detail.png" alt="Glyph Customization View showing icon preview, rename tools, desktop file paths, and launch button" class="gallery-img" width="883" height="1024" loading="lazy">
+              </div>
+            </div>
+            <div class="gallery-caption">
+              <span class="gallery-caption-title">Customization &amp; Details</span>
+              <span class="gallery-caption-desc">Drag and drop icons, edit display names, and test launch</span>
+            </div>
           </div>
         </div>
       </div>

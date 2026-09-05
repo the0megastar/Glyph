@@ -2,7 +2,6 @@
 
 document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
-  initScreenshotTabs();
   initCopyButton();
   fetchLatestRelease();
 });
@@ -53,41 +52,7 @@ function initThemeToggle() {
   });
 }
 
-/* 2. Screenshot Showcase Tab Switcher */
-function initScreenshotTabs() {
-  const tabs = document.querySelectorAll('.tab-btn');
-  const imgLibrary = document.getElementById('img-library');
-  const imgDetail = document.getElementById('img-detail');
-  const windowTitle = document.getElementById('windowTitle');
-
-  if (!tabs.length || !imgLibrary || !imgDetail) return;
-
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      const target = tab.getAttribute('data-target');
-
-      tabs.forEach((t) => {
-        t.classList.remove('active');
-        t.setAttribute('aria-selected', 'false');
-      });
-
-      tab.classList.add('active');
-      tab.setAttribute('aria-selected', 'true');
-
-      if (target === 'detail') {
-        imgLibrary.classList.add('hidden');
-        imgDetail.classList.remove('hidden');
-        if (windowTitle) windowTitle.textContent = 'Glyph — Customize Application';
-      } else {
-        imgDetail.classList.add('hidden');
-        imgLibrary.classList.remove('hidden');
-        if (windowTitle) windowTitle.textContent = 'Glyph — Installed Applications';
-      }
-    });
-  });
-}
-
-/* 3. Command Box Copy Functionality */
+/* 2. Command Box Copy Functionality */
 function initCopyButton() {
   const copyBtn = document.getElementById('copyBtn');
   const commandText = document.getElementById('commandText');
@@ -130,7 +95,7 @@ function initCopyButton() {
   });
 }
 
-/* 4. Progressive Enhancement: Latest GitHub Release Check */
+/* 3. Progressive Enhancement: Latest GitHub Release Check */
 async function fetchLatestRelease() {
   try {
     const res = await fetch('https://api.github.com/repos/the0megastar/Glyph/releases/latest');
@@ -139,7 +104,7 @@ async function fetchLatestRelease() {
     if (data && data.tag_name) {
       const versionPill = document.querySelector('.version-pill');
       if (versionPill) {
-        versionPill.innerHTML = `<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#33d17a;"></span> ${data.tag_name} • Native GTK4 & Libadwaita`;
+        versionPill.innerHTML = `<span class="status-dot" aria-hidden="true"></span> ${data.tag_name} • Native GTK4 & Libadwaita`;
       }
     }
   } catch {
