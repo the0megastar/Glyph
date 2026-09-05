@@ -1,0 +1,21 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//the0megastar//Glyph Flathub Reminder//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:glyph-flathub-pr-10083-reminder@the0megastar.com
+DTSTAMP:20260905T140000Z
+DTSTART:20270201T150000Z
+DTEND:20270201T153000Z
+SUMMARY:Glyph: Revisit Flathub Submission PR #10083 (5-Month Milestone)
+DESCRIPTION:Milestone reached: Glyph now has 5 months of active development history!\n\nChecklist to unblock Flathub PR #10083:\n1. Confirm human-designed vector SVG icon is committed in Glyph repo.\n2. Ensure Generative AI disclosure is set to None.\n3. Update PR manifest commit hash to latest release.\n4. Comment on https://github.com/flathub/flathub/pull/10083 requesting review.
+URL:https://github.com/flathub/flathub/pull/10083
+STATUS:CONFIRMED
+BEGIN:VALARM
+TRIGGER:-PT15M
+ACTION:DISPLAY
+DESCRIPTION:Reminder: Update Glyph Flathub PR #10083 with 5-month development history
+END:VALARM
+END:VEVENT
+END:VCALENDAR

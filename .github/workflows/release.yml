@@ -1,0 +1,248 @@
+name: Release Packages (Multi-Arch)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-flatpak:
+    name: Build Flatpak Bundle (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Flatpak & Flatpak Builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+
+      - name: Configure Flathub Remote
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Install GNOME Platform & SDK Runtime
+        run: |
+          flatpak install --user -y flathub org.gnome.Platform//49 org.gnome.Sdk//49
+
+      - name: Build Flatpak App & Repository
+        run: |
+          flatpak-builder --user --install-deps-from=flathub --force-clean --repo=repo build-dir io.github.the0megastar.Glyph.yaml
+
+      - name: Export Single-File Flatpak Bundle
+        run: |
+          flatpak build-bundle --arch=${{ matrix.arch }} repo Glyph-${{ matrix.arch }}.flatpak io.github.the0megastar.Glyph
+          # Create symlink/copy for generic bundle name on x86_64
+          if [ "${{ matrix.arch }}" = "x86_64" ]; then
+            cp Glyph-x86_64.flatpak Glyph.flatpak
+          fi
+
+      - name: Upload Flatpak Bundle Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-${{ matrix.arch }}
+          path: Glyph*.flatpak
+
+  build-deb-rpm:
+    name: Build Native Packages (.deb & .rpm)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools & dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build rpm python3-all
+
+      - name: Stage Meson installation
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+            VERSION="0.1.0"
+          fi
+          echo "PACKAGING_VERSION=$VERSION" >> $GITHUB_ENV
+          
+          meson setup _build --prefix=/usr
+          DESTDIR="$(pwd)/_pkg_root" meson install -C _build
+
+      - name: Build Debian Packages (.deb)
+        run: |
+          VERSION="${{ env.PACKAGING_VERSION }}"
+          DEB_DIR="$(pwd)/_deb_root"
+          mkdir -p "$DEB_DIR"
+          cp -r _pkg_root/* "$DEB_DIR/"
+          mkdir -p "$DEB_DIR/DEBIAN"
+
+          cat <<EOF > "$DEB_DIR/DEBIAN/control"
+          Package: glyph
+          Version: ${VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: all
+          Maintainer: the0megastar <https://github.com/the0megastar/Glyph>
+          Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, desktop-file-utils
+          Description: Customize application launcher icons and names on Linux
+           A modern desktop utility for Linux to browse installed applications,
+           customize launcher icons and display names safely at the user level,
+           and easily restore system defaults.
+          EOF
+          sed -i 's/^[ \t]*//' "$DEB_DIR/DEBIAN/control"
+
+          cat <<'EOF' > "$DEB_DIR/DEBIAN/postinst"
+          #!/bin/sh
+          set -e
+          if [ -x /usr/bin/update-desktop-database ]; then
+            update-desktop-database -q /usr/share/applications || true
+          fi
+          if [ -x /usr/bin/gtk-update-icon-cache ]; then
+            gtk-update-icon-cache -q /usr/share/icons/hicolor || true
+          fi
+          exit 0
+          EOF
+          chmod 755 "$DEB_DIR/DEBIAN/postinst"
+
+          dpkg-deb --build "$DEB_DIR" "glyph_${VERSION}_all.deb"
+          cp "glyph_${VERSION}_all.deb" "glyph_all.deb"
+          cp "glyph_all.deb" "glyph_amd64.deb"
+          cp "glyph_all.deb" "glyph_arm64.deb"
+          cp "glyph_all.deb" "glyph.deb"
+
+      - name: Build RPM Packages (.rpm)
+        run: |
+          VERSION="${{ env.PACKAGING_VERSION }}"
+          RPM_TOP="$HOME/rpmbuild"
+          mkdir -p "$RPM_TOP"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+
+          cat <<EOF > "$RPM_TOP/SPECS/glyph.spec"
+          Name:           glyph
+          Version:        ${VERSION}
+          Release:        1%{?dist}
+          Summary:        Customize application launcher icons and names on Linux
+          License:        GPL-3.0
+          URL:            https://github.com/the0megastar/Glyph
+          BuildArch:      noarch
+          Requires:       python3, gtk4, libadwaita, python3-gobject, desktop-file-utils
+
+          %description
+          A modern desktop utility for Linux to browse installed applications,
+          customize launcher icons and display names safely at the user level,
+          and easily restore system defaults.
+
+          %install
+          mkdir -p %{buildroot}
+          cp -r $(pwd)/_pkg_root/* %{buildroot}/
+
+          %post
+          /usr/bin/update-desktop-database &> /dev/null || :
+          /usr/bin/gtk-update-icon-cache /usr/share/icons/hicolor &> /dev/null || :
+
+          %files
+          /usr/bin/glyph
+          /usr/lib/python*
+          /usr/share/applications/*.desktop
+          /usr/share/metainfo/*.xml
+          /usr/share/icons/hicolor/*
+          EOF
+          sed -i 's/^[ \t]*//' "$RPM_TOP/SPECS/glyph.spec"
+
+          rpmbuild -bb "$RPM_TOP/SPECS/glyph.spec"
+          RPM_FILE=$(find "$RPM_TOP/RPMS" -name "*.rpm" | head -n 1)
+          cp "$RPM_FILE" "glyph.noarch.rpm"
+          cp "glyph.noarch.rpm" "glyph.rpm"
+          cp "glyph.noarch.rpm" "glyph-x86_64.rpm"
+          cp "glyph.noarch.rpm" "glyph-aarch64.rpm"
+
+      - name: Upload .deb & .rpm Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-packages
+          path: |
+            *.deb
+            *.rpm
+
+  build-appimage:
+    name: Build AppImage (x86_64 & aarch64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools & dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build file wget
+
+      - name: Stage AppDir
+        run: |
+          APPDIR="$(pwd)/AppDir"
+          mkdir -p "$APPDIR"
+          meson setup _build_appdir --prefix=/usr
+          DESTDIR="$APPDIR" meson install -C _build_appdir
+
+          # Setup AppDir root metadata
+          cp data/io.github.the0megastar.Glyph.desktop "$APPDIR/"
+          cp data/icons/hicolor/scalable/apps/io.github.the0megastar.Glyph.svg "$APPDIR/io.github.the0megastar.Glyph.svg"
+          cp "$APPDIR/io.github.the0megastar.Glyph.svg" "$APPDIR/.DirIcon"
+
+          # Create AppRun entrypoint
+          cat <<'EOF' > "$APPDIR/AppRun"
+          #!/bin/sh
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="${HERE}/usr/bin:${PATH}"
+          export PYTHONPATH="${HERE}/usr/lib/python3/dist-packages:${HERE}/usr/lib/python3/site-packages:${PYTHONPATH}"
+          export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+          exec "${HERE}/usr/bin/glyph" "$@"
+          EOF
+          chmod +x "$APPDIR/AppRun"
+
+      - name: Download AppImageTool and generate AppImage
+        run: |
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+          ./appimagetool --appimage-extract
+          ./squashfs-root/AppRun AppDir Glyph-x86_64.AppImage
+          cp Glyph-x86_64.AppImage Glyph.AppImage
+
+      - name: Upload AppImage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appimage
+          path: Glyph*.AppImage
+
+  publish-release:
+    name: Publish Release Assets
+    needs: [build-flatpak, build-deb-rpm, build-appimage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Display Release Files
+        run: |
+          ls -lh release-assets/
+
+      - name: Upload Release Binaries to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true

@@ -10,52 +10,66 @@ A modern Linux desktop application to browse installed applications, customize l
 
 Glyph never edits system files under `/usr/share/applications` or Flatpak/Snap export directories. It safely creates user-level overrides in `~/.local/share/applications/` (the standard FreeDesktop.org specification), copies customized icons into `~/.local/share/glyph/icons/`, and tracks state to allow clean, non-destructive reversion at any time.
 
+---
+
+## Downloads & Installation
+
+Pre-built binaries are generated for every release supporting both **64-bit PC (`x86_64`)** and **ARM64 (`aarch64`)** (Raspberry Pi 4/5, Apple Silicon with Asahi Linux, and ARM laptops).
+
+👉 **[Download Latest Release](https://github.com/the0megastar/Glyph/releases/latest)**
+
+### 📦 Flatpak Bundle (`.flatpak`) — Recommended
+Works universally on any Linux distribution with Flatpak installed (Ubuntu, Fedora, Arch, Debian, openSUSE, Mint, SteamOS, etc.).
+
+```bash
+# For 64-bit PC (Intel / AMD):
+flatpak install Glyph-x86_64.flatpak
+
+# For ARM64 (Raspberry Pi, Asahi Linux, ARM laptops):
+flatpak install Glyph-aarch64.flatpak
+```
+
+### 🚀 AppImage (`.AppImage`)
+Standalone portable executable. No installation required.
+
+```bash
+# Make executable and run
+chmod +x Glyph-x86_64.AppImage
+./Glyph-x86_64.AppImage
+```
+
+### 🐧 Debian / Ubuntu / Linux Mint / Pop!_OS (`.deb`)
+
+```bash
+# Install package and dependencies
+sudo apt install ./glyph_all.deb
+```
+
+### 🎩 Fedora / RHEL / openSUSE (`.rpm`)
+
+```bash
+# Install package
+sudo dnf install ./glyph.noarch.rpm
+```
+
+### 🏔️ Arch Linux (AUR)
+
+```bash
+yay -S glyph
+```
+
+*(AUR package maintained by the community. You can also install the Flatpak bundle or build from source below.)*
+
+---
+
 ## Compatibility & Desktop Environments
 
 Glyph is built using GTK4 and Libadwaita, and follows FreeDesktop.org (XDG) standards. It runs across all major desktop environments and Linux distributions:
+- **Architectures**: `x86_64` (Intel/AMD) and `aarch64` / `arm64` (Raspberry Pi 4 & 5, Asahi Linux on Apple Silicon, Snapdragon ARM laptops).
 - **Desktop Environments**: GNOME, KDE Plasma, COSMIC, Cinnamon, XFCE, MATE, and Wayland/X11 window managers.
 - **Distributions**: Fedora, Ubuntu, Debian, Arch Linux, openSUSE, SteamOS, and any system supporting Flatpak or GTK4.
 
-## Native Requirements
-
-- `gtk4` (>= 4.10), `libadwaita` (>= 1.4), `python3-gobject`, `desktop-file-utils`
-
-### Fedora
-```bash
-sudo dnf install gtk4 libadwaita python3-gobject desktop-file-utils meson ninja-build
-```
-
-### Ubuntu / Debian
-```bash
-sudo apt install libgtk-4-dev libadwaita-1-dev python3-gi desktop-file-utils meson ninja-build
-```
-
-### Arch Linux
-```bash
-sudo pacman -S gtk4 libadwaita python-gobject desktop-file-utils meson ninja
-```
-
-## Run without installing
-
-```bash
-chmod +x run.sh
-./run.sh
-```
-
-## Install for the app grid (user prefix)
-
-```bash
-meson setup build --prefix="$HOME/.local"
-meson compile -C build
-meson install -C build
-```
-
-That puts `glyph` on your `PATH` (if `~/.local/bin` is on it), installs `io.github.the0megastar.Glyph.desktop`, and installs the app icon. You may need to log out once, or run:
-
-```bash
-update-desktop-database ~/.local/share/applications
-gtk-update-icon-cache ~/.local/share/icons/hicolor
-```
+---
 
 ## Features
 
@@ -74,6 +88,8 @@ gtk-update-icon-cache ~/.local/share/icons/hicolor
   - **Open Data Folder in Files**: Inspect `~/.local/share/glyph/` directly.
   - **Keyboard Shortcuts**: View built-in shortcuts (`Ctrl+F`, `Ctrl+Q`, `Ctrl+?`, `Esc`).
 
+---
+
 ## Sources
 
 - **System**: Native applications installed system-wide via distro package managers (RPM, DEB, Pacman, etc.) under `/usr/share/applications/`.
@@ -81,12 +97,16 @@ gtk-update-icon-cache ~/.local/share/icons/hicolor
 - **Snap**: Applications installed via Snap.
 - **Local**: Applications installed directly in user space (e.g. `~/.local/bin/` or custom AppImage launchers).
 
-## How revert works
+---
+
+## How Revert Works
 
 - If Glyph created the local `.desktop` file, revert **deletes** it so the system or Flatpak entry is used again.
 - If you already had a local `.desktop` file, revert restores only the previous `Icon=` value.
 - "Restore stock" removes the local `.desktop` override completely so the desktop falls back to the original package.
 - Copied images and `~/.local/share/glyph/overrides.json` are cleaned up.
+
+---
 
 ## Icon Cache & Desktop Refresh
 
@@ -94,29 +114,74 @@ gtk-update-icon-cache ~/.local/share/icons/hicolor
 - **GNOME Shell**: GNOME Shell caches the app grid aggressively. Launching the customized app updates the dash/dock icon immediately, but the full-screen App Grid may take a session logout and login to reload its image cache.
 - Launcher icons are what this app changes. The icon inside a running window’s titlebar is provided by the application process itself and is out of scope.
 
+---
 
-## Support & Sponsorship
+## Building from Source
 
-If you find Glyph useful and would like to support its continued development, consider buying a coffee!
+If you want to hack on Glyph, contribute, or build it yourself:
 
-[![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/the0megastar)
-[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor-EA4AAA?style=for-the-badge&logo=github-sponsors&logoColor=white)](https://github.com/sponsors/the0megastar)
+### 1. Install Build Dependencies
 
-## Development
+#### Fedora / RHEL
+```bash
+sudo dnf install gtk4-devel libadwaita-devel python3-gobject desktop-file-utils meson ninja-build
+```
+
+#### Ubuntu / Debian / Linux Mint
+```bash
+sudo apt install libgtk-4-dev libadwaita-1-dev python3-gi desktop-file-utils meson ninja-build
+```
+
+#### Arch Linux
+```bash
+sudo pacman -S gtk4 libadwaita python-gobject desktop-file-utils meson ninja
+```
+
+### 2. Run Directly from Source (No Installation)
 
 ```bash
+chmod +x run.sh
+./run.sh
+```
+
+Or using Meson developer environment:
+```bash
 meson setup build
-meson compile -C build
 meson devenv -C build python3 -m glyph
 ```
 
-## Flatpak
+### 3. Install to User Prefix (`~/.local`)
 
-Glyph can be built and run as a sandboxed Flatpak using the included manifest (`io.github.the0megastar.Glyph.yaml`).
+```bash
+meson setup build --prefix="$HOME/.local"
+meson compile -C build
+meson install -C build
+```
 
-### Building with Flatpak Builder
+Update your desktop database and icon caches if needed:
+```bash
+update-desktop-database ~/.local/share/applications
+gtk-update-icon-cache ~/.local/share/icons/hicolor
+```
+
+### 4. Build Local Flatpak
 
 ```bash
 flatpak-builder --user --install --force-clean build-flatpak io.github.the0megastar.Glyph.yaml
 flatpak run io.github.the0megastar.Glyph
 ```
+
+---
+
+## Support & Sponsorship
+
+If you find Glyph useful and would like to support its continued development:
+
+[![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/the0megastar)
+[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor-EA4AAA?style=for-the-badge&logo=github-sponsors&logoColor=white)](https://github.com/sponsors/the0megastar)
+
+---
+
+## License
+
+Glyph is free and open-source software licensed under the [GNU General Public License v3.0](LICENSE).
