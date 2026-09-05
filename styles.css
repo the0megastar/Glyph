@@ -70,6 +70,10 @@ html {
   color-scheme: dark light;
 }
 
+section {
+  scroll-margin-top: 90px;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-base);
@@ -518,66 +522,104 @@ body {
   border: 1px solid rgba(230, 97, 0, 0.3);
 }
 
-/* Format Switcher Pills & Terminal Install Box */
-.install-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-top: 4px;
+/* Dedicated Install Section */
+.install-section {
+  padding: 60px 0 80px;
 }
 
-.format-tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.install-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.install-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  padding: 32px 26px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--card-shadow);
+  position: relative;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.install-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-highlight);
+}
+
+.install-card-primary {
+  border-color: var(--border-highlight);
+}
+
+.install-card-badge {
+  align-self: flex-start;
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-primary);
+  color: var(--accent-primary);
+  padding: 3px 10px;
   border-radius: var(--radius-full);
-  padding: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.install-card-icon {
+  font-size: 1.8rem;
   margin-bottom: 12px;
 }
 
-.format-tab {
-  border: none;
-  background: transparent;
+.install-card-title {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.install-card-desc {
   color: var(--text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 5px 13px;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  transition: all var(--transition-fast);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  margin-bottom: 20px;
+  flex-grow: 1;
 }
 
-.format-tab:hover {
-  color: var(--text-main);
-}
-
-.format-tab.active {
-  background: var(--bg-surface-elevated);
-  color: var(--text-main);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--border-highlight);
+.install-card .command-box {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 16px;
 }
 
 .command-box {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  background: var(--bg-surface);
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--bg-surface-elevated);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-full);
   padding: 5px 6px 5px 16px;
-  box-shadow: var(--card-shadow);
-  max-width: 95%;
-  margin: 0 auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
 }
 
 .command-text {
   font-family: var(--font-mono);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   color: var(--text-main);
   user-select: all;
-  margin-right: 12px;
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.command-text::-webkit-scrollbar {
+  display: none;
 }
 
 .copy-btn {
@@ -592,6 +634,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
   transition: var(--transition-fast);
 }
 
@@ -603,10 +646,15 @@ body {
   background: #2ec27e;
 }
 
-.install-footnote {
+.install-card-actions {
+  margin-top: auto;
+  margin-bottom: 16px;
+}
+
+.install-card-meta {
   font-size: 0.78rem;
   color: var(--text-dim);
-  margin-top: 10px;
+  margin-top: auto;
 }
 
 /* App Store Style Screenshot Gallery */
