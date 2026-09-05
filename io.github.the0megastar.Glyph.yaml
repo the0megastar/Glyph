@@ -12,10 +12,9 @@ finish-args:
   - --talk-name=org.freedesktop.Flatpak
   - --filesystem=xdg-data/applications:create
   - --filesystem=xdg-data/glyph:create
-  - --filesystem=host-os:ro
+  - --filesystem=xdg-data/icons:ro
   - --filesystem=/var/lib/flatpak:ro
   - --filesystem=xdg-data/flatpak:ro
-  - --filesystem=xdg-data/icons:ro
 
 cleanup:
   - /include
