@@ -23,10 +23,10 @@ Works universally on any Linux distribution with Flatpak installed (Ubuntu, Fedo
 
 ```bash
 # For 64-bit PC (Intel / AMD):
-flatpak install Glyph-x86_64.flatpak
+flatpak install Glyph-*-x86_64.flatpak
 
 # For ARM64 (Raspberry Pi, Asahi Linux, ARM laptops):
-flatpak install Glyph-aarch64.flatpak
+flatpak install Glyph-*-aarch64.flatpak
 ```
 
 ### 🚀 AppImage (`.AppImage`)
@@ -34,22 +34,22 @@ Standalone portable executable. No installation required.
 
 ```bash
 # Make executable and run
-chmod +x Glyph-x86_64.AppImage
-./Glyph-x86_64.AppImage
+chmod +x Glyph-*.AppImage
+./Glyph-*.AppImage
 ```
 
 ### 🐧 Debian / Ubuntu / Linux Mint / Pop!_OS (`.deb`)
 
 ```bash
 # Install package and dependencies
-sudo apt install ./glyph_all.deb
+sudo apt install ./glyph-*.deb
 ```
 
 ### 🎩 Fedora / RHEL / openSUSE (`.rpm`)
 
 ```bash
 # Install package
-sudo dnf install ./glyph.noarch.rpm
+sudo dnf install ./glyph-*.rpm
 ```
 
 ### 🏔️ Arch Linux (AUR)

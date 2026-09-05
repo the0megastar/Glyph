@@ -44,17 +44,17 @@ jobs:
 
       - name: Export Single-File Flatpak Bundle
         run: |
-          flatpak build-bundle --arch=${{ matrix.arch }} repo Glyph-${{ matrix.arch }}.flatpak io.github.the0megastar.Glyph
-          # Create symlink/copy for generic bundle name on x86_64
-          if [ "${{ matrix.arch }}" = "x86_64" ]; then
-            cp Glyph-x86_64.flatpak Glyph.flatpak
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+            VERSION="0.1.1"
           fi
+          flatpak build-bundle --arch=${{ matrix.arch }} repo "Glyph-${VERSION}-${{ matrix.arch }}.flatpak" io.github.the0megastar.Glyph
 
       - name: Upload Flatpak Bundle Artifact
         uses: actions/upload-artifact@v4
         with:
           name: flatpak-${{ matrix.arch }}
-          path: Glyph*.flatpak
+          path: Glyph-*.flatpak
 
   build-deb-rpm:
     name: Build Native Packages (.deb & .rpm)
@@ -114,11 +114,7 @@ jobs:
           EOF
           chmod 755 "$DEB_DIR/DEBIAN/postinst"
 
-          dpkg-deb --build "$DEB_DIR" "glyph_${VERSION}_all.deb"
-          cp "glyph_${VERSION}_all.deb" "glyph_all.deb"
-          cp "glyph_all.deb" "glyph_amd64.deb"
-          cp "glyph_all.deb" "glyph_arm64.deb"
-          cp "glyph_all.deb" "glyph.deb"
+          dpkg-deb --build "$DEB_DIR" "glyph-${VERSION}.deb"
 
       - name: Build RPM Packages (.rpm)
         run: |
@@ -159,18 +155,15 @@ jobs:
 
           rpmbuild -bb "$RPM_TOP/SPECS/glyph.spec"
           RPM_FILE=$(find "$RPM_TOP/RPMS" -name "*.rpm" | head -n 1)
-          cp "$RPM_FILE" "glyph.noarch.rpm"
-          cp "glyph.noarch.rpm" "glyph.rpm"
-          cp "glyph.noarch.rpm" "glyph-x86_64.rpm"
-          cp "glyph.noarch.rpm" "glyph-aarch64.rpm"
+          cp "$RPM_FILE" "glyph-${VERSION}.rpm"
 
       - name: Upload .deb & .rpm Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: native-packages
           path: |
-            *.deb
-            *.rpm
+            glyph-*.deb
+            glyph-*.rpm
 
   build-appimage:
     name: Build AppImage (x86_64 & aarch64)
@@ -210,17 +203,20 @@ jobs:
 
       - name: Download AppImageTool and generate AppImage
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+            VERSION="0.1.1"
+          fi
           wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
           chmod +x appimagetool
           ./appimagetool --appimage-extract
-          ARCH=x86_64 ./squashfs-root/AppRun AppDir Glyph-x86_64.AppImage
-          cp Glyph-x86_64.AppImage Glyph.AppImage
+          ARCH=x86_64 ./squashfs-root/AppRun AppDir "Glyph-${VERSION}.AppImage"
 
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
           name: appimage
-          path: Glyph*.AppImage
+          path: Glyph-*.AppImage
 
   publish-release:
     name: Publish Release Assets
