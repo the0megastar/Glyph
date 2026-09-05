@@ -266,15 +266,19 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 9px 18px;
+  gap: 9px;
+  height: 44px;
+  padding: 0 22px;
   border-radius: var(--radius-full);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 600;
+  line-height: 1;
   text-decoration: none;
   cursor: pointer;
   transition: var(--transition-fast);
   border: 1px solid transparent;
+  box-sizing: border-box;
+  vertical-align: middle;
 }
 
 /* GNOME Suggested Action Blue */
@@ -332,9 +336,13 @@ body {
   position: relative;
   z-index: 150;
   display: inline-flex;
+  align-items: stretch;
+  height: 44px;
   border-radius: var(--radius-full);
   box-shadow: 0 4px 14px rgba(53, 132, 228, 0.25);
   transition: transform var(--transition-fast);
+  box-sizing: border-box;
+  vertical-align: middle;
 }
 
 .split-btn-group:hover {
@@ -342,17 +350,25 @@ body {
 }
 
 .split-btn-main {
+  height: 100% !important;
   border-top-right-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
-  padding: 9px 16px !important;
-  font-size: 0.9rem !important;
+  padding: 0 18px !important;
+  font-size: 0.95rem !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
 }
 
 .split-btn-toggle {
+  height: 100% !important;
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
-  padding: 9px 12px !important;
+  padding: 0 13px !important;
   border-left: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .dropdown-chevron {
@@ -402,6 +418,7 @@ body {
 .dropdown-item {
   display: flex;
   align-items: center;
+  text-align: left !important;
   gap: 12px;
   padding: 10px 12px;
   border-radius: 10px;
@@ -433,6 +450,7 @@ body {
 .dropdown-item-info {
   flex-grow: 1;
   min-width: 0;
+  text-align: left !important;
 }
 
 .dropdown-item-title {
@@ -442,6 +460,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  text-align: left !important;
 }
 
 .dropdown-item-sub {
@@ -451,6 +470,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-top: 2px;
+  text-align: left !important;
 }
 
 .dropdown-item-ext {
