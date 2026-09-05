@@ -4,9 +4,9 @@ project(
   meson_version: '>= 0.63.0',
 )
 
-dependency('gtk4', version: '>= 4.10')
-dependency('libadwaita-1', version: '>= 1.4')
-dependency('pygobject-3.0')
+dependency('gtk4', version: '>= 4.10', required: false)
+dependency('libadwaita-1', version: '>= 1.4', required: false)
+dependency('pygobject-3.0', required: false)
 
 python = import('python').find_installation('python3')
 
