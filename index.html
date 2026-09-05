@@ -348,13 +348,33 @@
           <h2 class="section-title">Release Notes</h2>
         </div>
 
+        <!-- Release Card: v0.1.1 (Latest) -->
+        <div class="release-card" style="margin-bottom: 24px;">
+          <div class="release-header">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 700; color: var(--text-main);">Glyph v0.1.1</h3>
+              <span style="font-size: 0.86rem; color: var(--text-dim);">GNOME 50 Runtime &amp; Hardened Sandbox Permissions</span>
+            </div>
+            <span class="release-badge">Latest</span>
+          </div>
+
+          <ul class="release-notes-list">
+            <li><strong>Hardened Flatpak Sandbox</strong>: Replaced legacy broad <code>--filesystem=host:ro</code> permission with strictly scoped <code>--filesystem=host-os:ro</code>. Isolates the sandbox completely from the user's home directory, personal files, and credentials.</li>
+            <li><strong>Granular Data Directory Boundaries</strong>: Restricted write access exclusively to user launcher overrides (<code>~/.local/share/applications</code>) and custom icons (<code>~/.local/share/glyph</code>).</li>
+            <li><strong>GNOME 50 Runtime Support</strong>: Upgraded underlying base platform and Flatpak SDK runtime to GNOME 50.</li>
+            <li><strong>Read-Only Theme Access</strong>: Added explicit read-only access for user icon themes (<code>xdg-data/icons:ro</code>) alongside system Flatpak exports.</li>
+            <li><strong>Enhanced Host App Discovery</strong>: Adapted catalog discovery and GTK icon rendering engines to reliably detect native system packages and icons via <code>/run/host/usr</code>.</li>
+          </ul>
+        </div>
+
+        <!-- Release Card: v0.1.0 -->
         <div class="release-card">
           <div class="release-header">
             <div>
               <h3 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 700; color: var(--text-main);">Glyph v0.1.0</h3>
               <span style="font-size: 0.86rem; color: var(--text-dim);">Initial Beta Release</span>
             </div>
-            <span class="release-badge">Latest</span>
+            <span class="release-badge" style="background: rgba(255, 255, 255, 0.08); color: var(--text-muted);">v0.1.0</span>
           </div>
 
           <ul class="release-notes-list">
