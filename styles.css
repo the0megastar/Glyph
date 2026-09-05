@@ -262,6 +262,9 @@ body {
   margin-bottom: 24px;
 }
 
+/* ==========================================================================
+   Universal Button Primitive & Design System
+   ========================================================================== */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -270,6 +273,7 @@ body {
   height: 44px;
   padding: 0 22px;
   border-radius: var(--radius-full);
+  font-family: var(--font-body);
   font-size: 0.95rem;
   font-weight: 600;
   line-height: 1;
@@ -279,9 +283,23 @@ body {
   border: 1px solid transparent;
   box-sizing: border-box;
   vertical-align: middle;
+  user-select: none;
+  white-space: nowrap;
 }
 
-/* GNOME Suggested Action Blue */
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Button Size Variant (Navbar) */
+.btn-sm {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 0.86rem;
+  gap: 7px;
+}
+
+/* Button Variants (Colors & Themes Only) */
 .btn-primary {
   background: var(--accent-primary);
   color: #ffffff !important;
@@ -289,10 +307,8 @@ body {
 
 .btn-primary:hover {
   background: var(--accent-hover);
-  transform: translateY(-1px);
 }
 
-/* GNOME Standard Neutral Button */
 .btn-secondary {
   background: var(--bg-surface);
   border-color: var(--border-card);
@@ -302,10 +318,8 @@ body {
 .btn-secondary:hover {
   background: var(--bg-surface-elevated);
   border-color: var(--border-highlight);
-  transform: translateY(-1px);
 }
 
-/* Ko-fi Official Button */
 .btn-kofi {
   background: #ff5e5b;
   border-color: #ff5e5b;
@@ -315,10 +329,8 @@ body {
 .btn-kofi:hover {
   background: #ff4340;
   border-color: #ff4340;
-  transform: translateY(-1px);
 }
 
-/* GitHub Sponsors Button */
 .btn-sponsor {
   background: #ea4aaa;
   border-color: #ea4aaa;
@@ -328,10 +340,9 @@ body {
 .btn-sponsor:hover {
   background: #d83597;
   border-color: #d83597;
-  transform: translateY(-1px);
 }
 
-/* Split Button Group for Downloads */
+/* Split Button Group (Compound Component) */
 .split-btn-group {
   position: relative;
   z-index: 150;
@@ -349,26 +360,21 @@ body {
   transform: translateY(-1px);
 }
 
+.split-btn-group .btn:hover {
+  transform: none;
+}
+
 .split-btn-main {
-  height: 100% !important;
-  border-top-right-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
-  padding: 0 18px !important;
-  font-size: 0.95rem !important;
-  line-height: 1 !important;
-  box-sizing: border-box !important;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  padding-right: 18px;
 }
 
 .split-btn-toggle {
-  height: 100% !important;
-  border-top-left-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
-  padding: 0 13px !important;
-  border-left: 1px solid rgba(255, 255, 255, 0.25) !important;
-  box-sizing: border-box !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding: 0 13px;
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
 }
 
 .dropdown-chevron {
