@@ -21,11 +21,13 @@ Pre-built binaries are generated for every release supporting both **64-bit PC (
 ### 📦 Flatpak Bundle (`.flatpak`) — Recommended
 Works universally on any Linux distribution with Flatpak installed (Ubuntu, Fedora, Arch, Debian, openSUSE, Mint, SteamOS, etc.).
 
+**64-bit PC (Intel / AMD):**
 ```bash
-# For 64-bit PC (Intel / AMD):
 flatpak install Glyph-*-x86_64.flatpak
+```
 
-# For ARM64 (Raspberry Pi, Asahi Linux, ARM laptops):
+**ARM64 (Raspberry Pi, Asahi Linux, ARM laptops):**
+```bash
 flatpak install Glyph-*-aarch64.flatpak
 ```
 
@@ -33,22 +35,18 @@ flatpak install Glyph-*-aarch64.flatpak
 Standalone portable executable. No installation required.
 
 ```bash
-# Make executable and run
-chmod +x Glyph-*.AppImage
-./Glyph-*.AppImage
+chmod +x Glyph-*.AppImage && ./Glyph-*.AppImage
 ```
 
 ### 🐧 Debian / Ubuntu / Linux Mint / Pop!_OS (`.deb`)
 
 ```bash
-# Install package and dependencies
 sudo apt install ./glyph-*.deb
 ```
 
 ### 🎩 Fedora / RHEL / openSUSE (`.rpm`)
 
 ```bash
-# Install package
 sudo dnf install ./glyph-*.rpm
 ```
 
