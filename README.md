@@ -18,7 +18,7 @@ Pre-built binaries are generated for every release supporting both **64-bit PC (
 
 👉 **[Download Latest Release](https://github.com/the0megastar/Glyph/releases/latest)**
 
-### 📦 Flatpak Bundle (`.flatpak`) — Recommended
+### 📦 Flatpak Bundle (`.flatpak`) (Recommended)
 Works universally on any Linux distribution with Flatpak installed (Ubuntu, Fedora, Arch, Debian, openSUSE, Mint, SteamOS, etc.).
 
 **64-bit PC (Intel / AMD):**
