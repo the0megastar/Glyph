@@ -1,1 +1,7 @@
 .vscode/
+__pycache__/
+*.pyc
+/src/
+/io.github.the0megastar.Glyph.yaml
+/build/
+/builddir/
