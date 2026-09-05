@@ -184,7 +184,9 @@ body {
 
 /* Hero Section - Perfectly Centered & Hierarchy Focused */
 .hero-section {
-  padding: 44px 0 68px;
+  position: relative;
+  z-index: 50;
+  padding: 40px 0 54px;
   text-align: center;
 }
 
@@ -244,28 +246,30 @@ body {
   font-size: clamp(1.05rem, 1.8vw, 1.2rem);
   color: var(--text-muted);
   max-width: 620px;
-  margin: 0 auto 32px;
+  margin: 0 auto 30px;
   line-height: 1.6;
 }
 
-/* CTA Buttons */
+/* CTA Buttons - Sleek, Balanced & Elevated */
 .hero-cta {
+  position: relative;
+  z-index: 100;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  margin-bottom: 32px;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  padding: 12px 24px;
+  gap: 8px;
+  padding: 9px 18px;
   border-radius: var(--radius-full);
-  font-size: 0.96rem;
+  font-size: 0.9rem;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
@@ -326,6 +330,7 @@ body {
 /* Split Button Group for Downloads */
 .split-btn-group {
   position: relative;
+  z-index: 150;
   display: inline-flex;
   border-radius: var(--radius-full);
   box-shadow: 0 4px 14px rgba(53, 132, 228, 0.25);
@@ -339,13 +344,14 @@ body {
 .split-btn-main {
   border-top-right-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
-  padding-right: 14px !important;
+  padding: 9px 16px !important;
+  font-size: 0.9rem !important;
 }
 
 .split-btn-toggle {
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
-  padding: 12px 14px !important;
+  padding: 9px 12px !important;
   border-left: 1px solid rgba(255, 255, 255, 0.25) !important;
 }
 
@@ -357,29 +363,19 @@ body {
   transform: rotate(180deg);
 }
 
-.arch-badge {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.22);
-  margin-left: 4px;
-  letter-spacing: 0.02em;
-}
-
 /* Download Dropdown Panel */
 .download-dropdown-panel {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 8px);
   left: 50%;
-  transform: translateX(-50%) translateY(6px);
-  min-width: 340px;
+  transform: translateX(-50%) translateY(4px);
+  min-width: 330px;
   max-width: 92vw;
   background: var(--bg-surface-elevated);
   border: 1px solid var(--border-highlight);
-  border-radius: 16px;
-  padding: 8px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+  border-radius: 14px;
+  padding: 6px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.2);
   z-index: 1000;
   text-align: left;
   opacity: 0;
@@ -589,6 +585,8 @@ body {
 
 /* App Store Style Screenshot Gallery */
 .showcase-section {
+  position: relative;
+  z-index: 10;
   padding: 30px 0 70px;
 }
 
