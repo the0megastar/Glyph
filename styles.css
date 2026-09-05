@@ -1,6 +1,7 @@
 :root {
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-heading: 'Outfit', var(--font-sans);
+  --font-body: var(--font-sans);
   --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
 
   /* GNOME Dark / Libadwaita Theme (Default) */
@@ -350,7 +351,6 @@ body {
   align-items: stretch;
   height: 44px;
   border-radius: var(--radius-full);
-  box-shadow: 0 4px 14px rgba(53, 132, 228, 0.25);
   transition: transform var(--transition-fast);
   box-sizing: border-box;
   vertical-align: middle;
