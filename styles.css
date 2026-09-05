@@ -323,7 +323,221 @@ body {
   transform: translateY(-1px);
 }
 
-/* Command Snippet Box */
+/* Split Button Group for Downloads */
+.split-btn-group {
+  position: relative;
+  display: inline-flex;
+  border-radius: var(--radius-full);
+  box-shadow: 0 4px 14px rgba(53, 132, 228, 0.25);
+  transition: transform var(--transition-fast);
+}
+
+.split-btn-group:hover {
+  transform: translateY(-1px);
+}
+
+.split-btn-main {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  padding-right: 14px !important;
+}
+
+.split-btn-toggle {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  padding: 12px 14px !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.25) !important;
+}
+
+.dropdown-chevron {
+  transition: transform var(--transition-fast);
+}
+
+.split-btn-group.dropdown-open .dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.arch-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.22);
+  margin-left: 4px;
+  letter-spacing: 0.02em;
+}
+
+/* Download Dropdown Panel */
+.download-dropdown-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  min-width: 340px;
+  max-width: 92vw;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-highlight);
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+  backdrop-filter: blur(24px);
+}
+
+.download-dropdown-panel.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.dropdown-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  padding: 8px 10px 4px;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text-main);
+  transition: background var(--transition-fast);
+  border: none;
+  background: transparent;
+  width: 100%;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus-visible {
+  background: var(--bg-surface);
+  outline: none;
+}
+
+.dropdown-item-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+}
+
+.dropdown-item-info {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.dropdown-item-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dropdown-item-sub {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.dropdown-item-ext {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--border-card);
+  margin: 6px 0;
+}
+
+/* Status Chips */
+.chip {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.chip-recommended {
+  background: rgba(53, 132, 228, 0.18);
+  color: var(--accent-primary);
+  border: 1px solid rgba(53, 132, 228, 0.3);
+}
+
+.chip-pending {
+  background: rgba(230, 97, 0, 0.16);
+  color: #e66100;
+  border: 1px solid rgba(230, 97, 0, 0.3);
+}
+
+/* Format Switcher Pills & Terminal Install Box */
+.install-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.format-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-full);
+  padding: 4px;
+  margin-bottom: 12px;
+}
+
+.format-tab {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 5px 13px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.format-tab:hover {
+  color: var(--text-main);
+}
+
+.format-tab.active {
+  background: var(--bg-surface-elevated);
+  color: var(--text-main);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-highlight);
+}
+
 .command-box {
   display: inline-flex;
   align-items: center;
@@ -365,6 +579,12 @@ body {
 
 .copy-btn.copied {
   background: #2ec27e;
+}
+
+.install-footnote {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-top: 10px;
 }
 
 /* App Store Style Screenshot Gallery */
