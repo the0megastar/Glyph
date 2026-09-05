@@ -433,6 +433,7 @@ body {
   padding: 10px 12px;
   border-radius: 10px;
   text-decoration: none;
+  font-family: var(--font-body);
   color: var(--text-main);
   transition: background var(--transition-fast);
   border: none;
@@ -440,6 +441,11 @@ body {
   width: 100%;
   cursor: pointer;
   box-sizing: border-box;
+}
+
+button.dropdown-item {
+  font-family: var(--font-body);
+  font-size: inherit;
 }
 
 .dropdown-item:hover,
@@ -466,6 +472,7 @@ body {
 .dropdown-item-title {
   font-size: 0.88rem;
   font-weight: 600;
+  font-family: var(--font-body);
   color: var(--text-main);
   display: flex;
   align-items: center;
@@ -475,6 +482,7 @@ body {
 
 .dropdown-item-sub {
   font-size: 0.74rem;
+  font-family: var(--font-body);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -484,7 +492,8 @@ body {
 }
 
 .dropdown-item-ext {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
+  font-weight: 600;
   font-size: 0.74rem;
   color: var(--text-dim);
   padding: 2px 7px;

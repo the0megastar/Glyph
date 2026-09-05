@@ -2,9 +2,8 @@
 
 document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
-  initCopyButton();
+  initCopyButtons();
   initDownloadDropdown();
-  initFormatTabs();
   fetchLatestRelease();
 });
 
@@ -102,89 +101,46 @@ function initDownloadDropdown() {
     archAurDropdownItem.addEventListener('click', (e) => {
       e.preventDefault();
       closeDropdown();
-      selectFormatTab('arch');
-      const installSection = document.getElementById('install');
-      if (installSection) {
-        installSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const archCard = document.getElementById('archInstallCard') || document.getElementById('install');
+      if (archCard) {
+        archCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     });
   }
 }
 
-/* 3. Format Tabs & Command Switcher */
-const formatCommands = {
-  flatpak: 'flatpak install Glyph-0.1.1-x86_64.flatpak',
-  deb: 'sudo apt install ./glyph-0.1.1.deb',
-  rpm: 'sudo dnf install ./glyph-0.1.1.rpm',
-  arch: 'yay -S glyph'
-};
+/* 3. Command Box Copy Functionality */
+function initCopyButtons() {
+  function attachCopy(btnId, textId, labelId) {
+    const btn = document.getElementById(btnId);
+    const textEl = document.getElementById(textId);
+    const label = document.getElementById(labelId);
+    if (!btn || !textEl) return;
 
-function selectFormatTab(formatKey) {
-  const tabs = document.querySelectorAll('.format-tab');
-  const commandText = document.getElementById('commandText');
-
-  tabs.forEach((tab) => {
-    const isTarget = tab.dataset.format === formatKey;
-    tab.classList.toggle('active', isTarget);
-    tab.setAttribute('aria-selected', isTarget ? 'true' : 'false');
-  });
-
-  if (commandText && formatCommands[formatKey]) {
-    commandText.textContent = formatCommands[formatKey];
-  }
-}
-
-function initFormatTabs() {
-  const tabs = document.querySelectorAll('.format-tab');
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      const format = tab.dataset.format;
-      if (format) selectFormatTab(format);
-    });
-  });
-}
-
-/* 4. Command Box Copy Functionality */
-function initCopyButton() {
-  const copyBtn = document.getElementById('copyBtn');
-  const commandText = document.getElementById('commandText');
-  const copyBtnLabel = document.getElementById('copyBtnLabel');
-
-  if (!copyBtn || !commandText) return;
-
-  copyBtn.addEventListener('click', async () => {
-    const textToCopy = commandText.textContent.trim();
-
-    try {
-      await navigator.clipboard.writeText(textToCopy);
-      copyBtn.classList.add('copied');
-      if (copyBtnLabel) copyBtnLabel.textContent = 'Copied!';
-
-      setTimeout(() => {
-        copyBtn.classList.remove('copied');
-        if (copyBtnLabel) copyBtnLabel.textContent = 'Copy';
-      }, 2200);
-    } catch {
-      // Fallback for clipboard
-      const textarea = document.createElement('textarea');
-      textarea.value = textToCopy;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
+    btn.addEventListener('click', async () => {
+      const textToCopy = textEl.textContent.trim();
       try {
-        document.execCommand('copy');
-        copyBtn.classList.add('copied');
-        if (copyBtnLabel) copyBtnLabel.textContent = 'Copied!';
-        setTimeout(() => {
-          copyBtn.classList.remove('copied');
-          if (copyBtnLabel) copyBtnLabel.textContent = 'Copy';
-        }, 2200);
-      } finally {
-        document.body.removeChild(textarea);
+        await navigator.clipboard.writeText(textToCopy);
+      } catch {
+        const textarea = document.createElement('textarea');
+        textarea.value = textToCopy;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try { document.execCommand('copy'); } finally { document.body.removeChild(textarea); }
       }
-    }
-  });
+      btn.classList.add('copied');
+      if (label) label.textContent = 'Copied!';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        if (label) label.textContent = 'Copy';
+      }, 2200);
+    });
+  }
+
+  attachCopy('copyBtn', 'commandText', 'copyBtnLabel');
+  attachCopy('archCopyBtn', 'archCommandText', 'archCopyBtnLabel');
 }
 
 /* 5. Progressive Enhancement: Latest GitHub Release Check */
