@@ -1,14 +1,28 @@
+import os
 import sys
+from pathlib import Path
+
+# In Flatpak container, ensure host OS and Flatpak export data directories are available
+# before GLib/Gio applications or desktop files are cataloged.
+if Path("/.flatpak-info").exists():
+    _xdg_dirs = [d for d in os.environ.get("XDG_DATA_DIRS", "/app/share:/usr/share").split(":") if d]
+    for _host_dir in [
+        "/run/host/usr/share",
+        "/run/host/usr/local/share",
+        "/var/lib/flatpak/exports/share",
+    ]:
+        if _host_dir not in _xdg_dirs and Path(_host_dir).is_dir():
+            _xdg_dirs.append(_host_dir)
+    os.environ["XDG_DATA_DIRS"] = ":".join(_xdg_dirs)
 
 import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from pathlib import Path
-
 from gi.repository import Adw, Gdk, Gio, Gtk  # noqa: E402
 
+from glyph import __version__  # noqa: E402
 from glyph.overrides import (  # noqa: E402
     DATA_DIR,
     export_backup,
@@ -209,7 +223,7 @@ class GlyphApplication(Adw.Application):
             application_name="Glyph",
             application_icon=APP_ID,
             developer_name="the0megastar",
-            version="0.1.0",
+            version=__version__,
             comments="A modern utility to customize and restore application icons on Linux.",
             website="https://the0megastar.github.io/Glyph",
             issue_url="https://github.com/the0megastar/Glyph/issues",
@@ -218,16 +232,14 @@ class GlyphApplication(Adw.Application):
             license_type=Gtk.License.GPL_3_0,
             developers=["the0megastar"],
             designers=["the0megastar"],
-            release_notes_version="0.1.0",
+            release_notes_version=__version__,
             release_notes=(
-                "<p>Initial public release:</p>"
+                "<p>Hardened Flatpak sandbox and updated to GNOME 50:</p>"
                 "<ul>"
-                "<li>Browse and search installed apps</li>"
-                "<li>Set custom icons from SVG or PNG</li>"
-                "<li>Safe user-level icon overrides</li>"
-                "<li>One-click restore to system defaults</li>"
-                "<li>Direct application test-launch</li>"
-                "<li>Native Libadwaita dark mode design</li>"
+                "<li>Updated runtime to GNOME 50</li>"
+                "<li>Replaced broad filesystem permissions with scoped host-os:ro and granular data directory access</li>"
+                "<li>Improved host application and icon discovery inside Flatpak sandbox</li>"
+                "<li>Full user-space launcher override and restore capabilities</li>"
                 "</ul>"
             ),
         )
@@ -245,11 +257,19 @@ class GlyphApplication(Adw.Application):
 
 def main(argv=None):
     Adw.init()
-    icon_dir = Path(__file__).resolve().parent.parent.parent / "data" / "icons"
-    if icon_dir.is_dir():
-        display = Gdk.Display.get_default()
-        if display:
-            theme = Gtk.IconTheme.get_for_display(display)
+    display = Gdk.Display.get_default()
+    if display:
+        theme = Gtk.IconTheme.get_for_display(display)
+        icon_dir = Path(__file__).resolve().parent.parent.parent / "data" / "icons"
+        if icon_dir.is_dir():
             theme.add_search_path(str(icon_dir))
+        if Path("/.flatpak-info").exists():
+            for host_icon_dir in [
+                "/run/host/usr/share/icons",
+                "/run/host/usr/share/pixmaps",
+                "/var/lib/flatpak/exports/share/icons",
+            ]:
+                if Path(host_icon_dir).is_dir():
+                    theme.add_search_path(host_icon_dir)
     app = GlyphApplication()
     return app.run(argv if argv is not None else sys.argv)

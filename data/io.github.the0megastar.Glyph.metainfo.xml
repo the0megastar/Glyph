@@ -45,6 +45,17 @@
   </screenshots>
 
   <releases>
+    <release version="0.1.1" date="2026-09-05">
+      <description>
+        <p>Hardened Flatpak sandbox and updated to GNOME 50:</p>
+        <ul>
+          <li>Updated runtime to GNOME 50</li>
+          <li>Replaced broad filesystem permissions with scoped host-os:ro and granular data directory access</li>
+          <li>Improved host application and icon discovery inside Flatpak sandbox</li>
+          <li>Full user-space launcher override and restore capabilities</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-09-03">
       <description>
         <p>Initial public release:</p>

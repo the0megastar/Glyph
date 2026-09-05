@@ -1,6 +1,6 @@
 app-id: io.github.the0megastar.Glyph
 runtime: org.gnome.Platform
-runtime-version: '49'
+runtime-version: '50'
 sdk: org.gnome.Sdk
 command: glyph
 
@@ -12,9 +12,10 @@ finish-args:
   - --talk-name=org.freedesktop.Flatpak
   - --filesystem=xdg-data/applications:create
   - --filesystem=xdg-data/glyph:create
-  - --filesystem=host:ro
+  - --filesystem=host-os:ro
   - --filesystem=/var/lib/flatpak:ro
   - --filesystem=xdg-data/flatpak:ro
+  - --filesystem=xdg-data/icons:ro
 
 cleanup:
   - /include

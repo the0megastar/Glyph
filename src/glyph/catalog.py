@@ -33,6 +33,8 @@ USER_APPLICATIONS_DIR = XDG_DATA_HOME / "applications"
 
 def get_stock_application_dirs() -> list[Path]:
     dirs: list[Path] = [
+        Path("/run/host/usr/share/applications"),
+        Path("/run/host/usr/local/share/applications"),
         Path("/usr/share/applications"),
         Path("/usr/local/share/applications"),
         Path("/var/lib/flatpak/exports/share/applications"),
@@ -60,6 +62,8 @@ def find_stock_desktop_file(desktop_id: str) -> str:
 
 def classify_source(path: str) -> str:
     p = path.replace("\\", "/")
+    if "/run/host/" in p:
+        return "System"
     if "/flatpak/" in p:
         return "Flatpak"
     if "/snapd/" in p or "/snap/" in p:

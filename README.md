@@ -55,10 +55,14 @@ sudo dnf install ./glyph.noarch.rpm
 ### 🏔️ Arch Linux (AUR)
 
 ```bash
+# Using yay:
 yay -S glyph
+
+# Or using paru:
+paru -S glyph
 ```
 
-*(AUR package maintained by the community. You can also install the Flatpak bundle or build from source below.)*
+*(Package available in the Arch User Repository)*
 
 ---
 
