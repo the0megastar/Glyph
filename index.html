@@ -415,14 +415,33 @@
           <h2 class="section-title">Release Notes</h2>
         </div>
 
-        <!-- Release Card: v0.1.1 (Latest) -->
+        <!-- Release Card: v0.1.2 (Latest) -->
+        <div class="release-card" style="margin-bottom: 24px;">
+          <div class="release-header">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 700; color: var(--text-main);">Glyph v0.1.2</h3>
+              <span style="font-size: 0.86rem; color: var(--text-dim);">Least-Privilege Scoped Permissions &amp; Flathub Compliance</span>
+            </div>
+            <span class="release-badge">Latest</span>
+          </div>
+
+          <ul class="release-notes-list">
+            <li><strong>Strict Flatpak Scoping</strong>: Replaced broad filesystem permissions with strictly scoped access to <code>/var/lib/flatpak/exports/share:ro</code> and <code>/var/lib/flatpak/app:ro</code> (and user equivalents). Completely locks out system runtimes, ostree objects, and repo metadata.</li>
+            <li><strong>Default Sandbox Isolation</strong>: Removed explicit host permissions for app state, relying exclusively on private sandboxed storage (<code>XDG_DATA_HOME</code>) for custom icons and backups.</li>
+            <li><strong>Full Host Boundary Protection</strong>: Completely eliminated <code>host:ro</code> and <code>host-os:ro</code> to satisfy Flathub security guidelines and isolate user personal files, documents, and credentials.</li>
+            <li><strong>Granular Launcher Overrides</strong>: Maintained scoped write access solely for user desktop overrides (<code>~/.local/share/applications</code>) and read-only user icon themes (<code>~/.local/share/icons</code>).</li>
+            <li><strong>Multi-Architecture Release Pipeline</strong>: Verified builds across 64-bit PC (<code>x86_64</code>) and ARM64 (<code>aarch64</code>) across Flatpak, AppImage, deb, and rpm packages.</li>
+          </ul>
+        </div>
+
+        <!-- Release Card: v0.1.1 -->
         <div class="release-card" style="margin-bottom: 24px;">
           <div class="release-header">
             <div>
               <h3 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 700; color: var(--text-main);">Glyph v0.1.1</h3>
               <span style="font-size: 0.86rem; color: var(--text-dim);">GNOME 50 Runtime &amp; Hardened Sandbox Permissions</span>
             </div>
-            <span class="release-badge">Latest</span>
+            <span class="release-badge" style="background: rgba(255, 255, 255, 0.08); color: var(--text-muted);">v0.1.1</span>
           </div>
 
           <ul class="release-notes-list">
