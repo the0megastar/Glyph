@@ -88,30 +88,30 @@ jobs:
           mkdir -p "$DEB_DIR/DEBIAN"
 
           cat <<EOF > "$DEB_DIR/DEBIAN/control"
-Package: glyph
-Version: ${VERSION}
-Section: utils
-Priority: optional
-Architecture: all
-Maintainer: the0megastar <https://github.com/the0megastar/Glyph>
-Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, desktop-file-utils
-Description: Customize application launcher icons and names on Linux
- A modern desktop utility for Linux to browse installed applications,
- customize launcher icons and display names safely at the user level,
- and easily restore system defaults.
-EOF
+          Package: glyph
+          Version: ${VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: all
+          Maintainer: the0megastar <https://github.com/the0megastar/Glyph>
+          Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, desktop-file-utils
+          Description: Customize application launcher icons and names on Linux
+           A modern desktop utility for Linux to browse installed applications,
+           customize launcher icons and display names safely at the user level,
+           and easily restore system defaults.
+          EOF
 
           cat <<'EOF' > "$DEB_DIR/DEBIAN/postinst"
-#!/bin/sh
-set -e
-if [ -x /usr/bin/update-desktop-database ]; then
-  update-desktop-database -q /usr/share/applications || true
-fi
-if [ -x /usr/bin/gtk-update-icon-cache ]; then
-  gtk-update-icon-cache -q /usr/share/icons/hicolor || true
-fi
-exit 0
-EOF
+          #!/bin/sh
+          set -e
+          if [ -x /usr/bin/update-desktop-database ]; then
+            update-desktop-database -q /usr/share/applications || true
+          fi
+          if [ -x /usr/bin/gtk-update-icon-cache ]; then
+            gtk-update-icon-cache -q /usr/share/icons/hicolor || true
+          fi
+          exit 0
+          EOF
           chmod 755 "$DEB_DIR/DEBIAN/postinst"
 
           dpkg-deb --build "$DEB_DIR" "glyph_${VERSION}_all.deb"
@@ -127,35 +127,35 @@ EOF
           mkdir -p "$RPM_TOP"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
           cat <<EOF > "$RPM_TOP/SPECS/glyph.spec"
-Name:           glyph
-Version:        ${VERSION}
-Release:        1%{?dist}
-Summary:        Customize application launcher icons and names on Linux
-License:        GPL-3.0
-URL:            https://github.com/the0megastar/Glyph
-BuildArch:      noarch
-Requires:       python3, gtk4, libadwaita, python3-gobject, desktop-file-utils
+          Name:           glyph
+          Version:        ${VERSION}
+          Release:        1%{?dist}
+          Summary:        Customize application launcher icons and names on Linux
+          License:        GPL-3.0
+          URL:            https://github.com/the0megastar/Glyph
+          BuildArch:      noarch
+          Requires:       python3, gtk4, libadwaita, python3-gobject, desktop-file-utils
 
-%description
-A modern desktop utility for Linux to browse installed applications,
-customize launcher icons and display names safely at the user level,
-and easily restore system defaults.
+          %description
+          A modern desktop utility for Linux to browse installed applications,
+          customize launcher icons and display names safely at the user level,
+          and easily restore system defaults.
 
-%install
-mkdir -p %{buildroot}
-cp -r $(pwd)/_pkg_root/* %{buildroot}/
+          %install
+          mkdir -p %{buildroot}
+          cp -r $(pwd)/_pkg_root/* %{buildroot}/
 
-%post
-/usr/bin/update-desktop-database &> /dev/null || :
-/usr/bin/gtk-update-icon-cache /usr/share/icons/hicolor &> /dev/null || :
+          %post
+          /usr/bin/update-desktop-database &> /dev/null || :
+          /usr/bin/gtk-update-icon-cache /usr/share/icons/hicolor &> /dev/null || :
 
-%files
-/usr/bin/glyph
-/usr/lib/python*
-/usr/share/applications/*.desktop
-/usr/share/metainfo/*.xml
-/usr/share/icons/hicolor/*
-EOF
+          %files
+          /usr/bin/glyph
+          /usr/lib/python*
+          /usr/share/applications/*.desktop
+          /usr/share/metainfo/*.xml
+          /usr/share/icons/hicolor/*
+          EOF
 
           rpmbuild -bb "$RPM_TOP/SPECS/glyph.spec"
           RPM_FILE=$(find "$RPM_TOP/RPMS" -name "*.rpm" | head -n 1)
