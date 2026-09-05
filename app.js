@@ -113,9 +113,9 @@ function initDownloadDropdown() {
 
 /* 3. Format Tabs & Command Switcher */
 const formatCommands = {
-  flatpak: 'flatpak install Glyph-x86_64.flatpak',
-  deb: 'sudo apt install ./glyph_all.deb',
-  rpm: 'sudo dnf install ./glyph.noarch.rpm',
+  flatpak: 'flatpak install Glyph-0.1.1-x86_64.flatpak',
+  deb: 'sudo apt install ./glyph-0.1.1.deb',
+  rpm: 'sudo dnf install ./glyph-0.1.1.rpm',
   arch: 'yay -S glyph'
 };
 
