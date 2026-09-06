@@ -37,7 +37,14 @@ cp data/io.github.the0megastar.Glyph.desktop "${APPDIR}/"
 cp data/io.github.the0megastar.Glyph.metainfo.xml "${APPDIR}/usr/share/metainfo/"
 cp data/icons/io.github.the0megastar.Glyph.svg "${APPDIR}/usr/share/icons/hicolor/scalable/apps/"
 cp data/icons/io.github.the0megastar.Glyph.svg "${APPDIR}/io.github.the0megastar.Glyph.svg"
-cp data/icons/io.github.the0megastar.Glyph.svg "${APPDIR}/.DirIcon"
+if [ -f "data/icons/io.github.the0megastar.Glyph.png" ]; then
+  mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
+  cp data/icons/io.github.the0megastar.Glyph.png "${APPDIR}/usr/share/icons/hicolor/256x256/apps/"
+  cp data/icons/io.github.the0megastar.Glyph.png "${APPDIR}/io.github.the0megastar.Glyph.png"
+  cp data/icons/io.github.the0megastar.Glyph.png "${APPDIR}/.DirIcon"
+else
+  cp data/icons/io.github.the0megastar.Glyph.svg "${APPDIR}/.DirIcon"
+fi
 
 # 2. Stage GSettings Schemas
 echo "--> Bundling GSettings schemas..."
