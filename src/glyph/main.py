@@ -36,6 +36,67 @@ from glyph.window import GlyphWindow  # noqa: E402
 
 APP_ID = "io.github.the0megastar.Glyph"
 
+SHORTCUTS_UI = """<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <object class="GtkShortcutsWindow" id="shortcuts">
+    <property name="modal">True</property>
+    <child>
+      <object class="GtkShortcutsSection">
+        <property name="visible">True</property>
+        <property name="section-name">shortcuts</property>
+        <child>
+          <object class="GtkShortcutsGroup">
+            <property name="visible">True</property>
+            <property name="title">General</property>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title">Search applications</property>
+                <property name="accelerator">&lt;primary&gt;f</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title">Keyboard shortcuts</property>
+                <property name="accelerator">&lt;primary&gt;question</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title">Quit</property>
+                <property name="accelerator">&lt;primary&gt;q</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="GtkShortcutsGroup">
+            <property name="visible">True</property>
+            <property name="title">Navigation &amp; Editing</property>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title">Back to applications</property>
+                <property name="accelerator">&lt;alt&gt;Left</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title">Cancel / Close dialog</property>
+                <property name="accelerator">Escape</property>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>
+"""
+
 
 class GlyphApplication(Adw.Application):
     def __init__(self):
@@ -245,26 +306,13 @@ class GlyphApplication(Adw.Application):
         launcher = Gtk.FileLauncher.new(Gio.File.new_for_path(str(DATA_DIR)))
         launcher.launch(win, None, None)
 
+
+
     def on_shortcuts(self, *_args):
         win = self.props.active_window
-        shortcuts = Gtk.ShortcutsWindow(transient_for=win, modal=True)
-        section = Gtk.ShortcutsSection()
-        section.set_visible(True)
-
-        group_gen = Gtk.ShortcutsGroup(title="General")
-        group_gen.set_visible(True)
-        group_gen.append(Gtk.ShortcutsShortcut(title="Search applications", accelerator="<primary>f", visible=True))
-        group_gen.append(Gtk.ShortcutsShortcut(title="Keyboard shortcuts", accelerator="<primary>question", visible=True))
-        group_gen.append(Gtk.ShortcutsShortcut(title="Quit", accelerator="<primary>q", visible=True))
-        section.append(group_gen)
-
-        group_nav = Gtk.ShortcutsGroup(title="Navigation & Editing")
-        group_nav.set_visible(True)
-        group_nav.append(Gtk.ShortcutsShortcut(title="Back to applications", accelerator="<alt>Left", visible=True))
-        group_nav.append(Gtk.ShortcutsShortcut(title="Cancel / Close dialog", accelerator="Escape", visible=True))
-        section.append(group_nav)
-
-        shortcuts.add_section(section)
+        builder = Gtk.Builder.new_from_string(SHORTCUTS_UI, -1)
+        shortcuts = builder.get_object("shortcuts")
+        shortcuts.set_transient_for(win)
         shortcuts.present()
 
     def on_about(self, *_args):
