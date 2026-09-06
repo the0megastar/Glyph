@@ -10,8 +10,41 @@ permissions:
   contents: write
 
 jobs:
+  validate-and-test:
+    name: Validate & Run Test Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-gi \
+            python3-gi-cairo \
+            gir1.2-gtk-4.0 \
+            gir1.2-adw-1 \
+            libgirepository1.0-dev \
+            desktop-file-utils \
+            appstream
+
+      - name: Validate Release Version & Metadata
+        run: |
+          python3 scripts/validate_release.py --tag "${GITHUB_REF_NAME:-}"
+
+      - name: Run Unit Tests
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python3 -B -m unittest discover -s tests -v
+
   build-flatpak:
     name: Build Flatpak Bundle (${{ matrix.arch }})
+    needs: [validate-and-test]
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -46,7 +79,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
-            VERSION="0.1.1"
+            VERSION=$(PYTHONPATH=src python3 -c "import glyph; print(glyph.__version__)")
           fi
           flatpak build-bundle --arch=${{ matrix.arch }} repo "Glyph-${VERSION}-${{ matrix.arch }}.flatpak" io.github.the0megastar.Glyph
 
@@ -58,6 +91,7 @@ jobs:
 
   build-deb-rpm:
     name: Build Native Packages (.deb & .rpm)
+    needs: [validate-and-test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -66,13 +100,23 @@ jobs:
       - name: Install build tools & dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y meson ninja-build rpm python3-all libgtk-4-dev libadwaita-1-dev
+          sudo apt-get install -y \
+            meson \
+            ninja-build \
+            rpm \
+            python3-all \
+            python3-gi \
+            python3-gi-cairo \
+            libgirepository1.0-dev \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            desktop-file-utils
 
       - name: Stage Meson installation
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
-            VERSION="0.1.1"
+            VERSION=$(PYTHONPATH=src python3 -c "import glyph; print(glyph.__version__)")
           fi
           echo "PACKAGING_VERSION=$VERSION" >> $GITHUB_ENV
           
@@ -81,7 +125,7 @@ jobs:
 
       - name: Build Debian Packages (.deb)
         run: |
-          VERSION="${{ env.PACKAGING_VERSION }}"
+          VERSION="${PACKAGING_VERSION:?PACKAGING_VERSION was not set}"
           DEB_DIR="$(pwd)/_deb_root"
           mkdir -p "$DEB_DIR"
           cp -r _pkg_root/* "$DEB_DIR/"
@@ -118,16 +162,17 @@ jobs:
 
       - name: Build RPM Packages (.rpm)
         run: |
-          VERSION="${{ env.PACKAGING_VERSION }}"
+          VERSION="${PACKAGING_VERSION:?PACKAGING_VERSION was not set}"
           RPM_TOP="$HOME/rpmbuild"
           mkdir -p "$RPM_TOP"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
-          cat <<EOF > "$RPM_TOP/SPECS/glyph.spec"
+          # Quote heredoc so shell variables $d, $py_dir are preserved verbatim for rpmbuild
+          cat <<'EOF' > "$RPM_TOP/SPECS/glyph.spec"
           Name:           glyph
-          Version:        ${VERSION}
+          Version:        __VERSION__
           Release:        1%{?dist}
           Summary:        Customize application launcher icons and names on Linux
-          License:        GPL-3.0
+          License:        GPL-3.0-or-later
           URL:            https://github.com/the0megastar/Glyph
           BuildArch:      noarch
           Requires:       python3 >= 3.10, gtk4 >= 4.10, libadwaita >= 1.5, python3-gobject, desktop-file-utils
@@ -139,7 +184,7 @@ jobs:
 
           %install
           mkdir -p %{buildroot}
-          cp -r $(pwd)/_pkg_root/* %{buildroot}/
+          cp -r __PKG_ROOT__/* %{buildroot}/
           for d in %{buildroot}/usr/lib/python*/dist-packages; do
             if [ -d "$d" ]; then
               py_dir=$(dirname "$d")
@@ -160,6 +205,9 @@ jobs:
           /usr/share/icons/hicolor/*
           EOF
 
+          sed -i "s|__VERSION__|${VERSION}|g" "$RPM_TOP/SPECS/glyph.spec"
+          sed -i "s|__PKG_ROOT__|$(pwd)/_pkg_root|g" "$RPM_TOP/SPECS/glyph.spec"
+
           rpmbuild -bb "$RPM_TOP/SPECS/glyph.spec"
           RPM_FILE=$(find "$RPM_TOP/RPMS" -name "*.rpm" | head -n 1)
           cp "$RPM_FILE" "glyph-${VERSION}.rpm"
@@ -173,8 +221,17 @@ jobs:
             glyph-*.rpm
 
   build-appimage:
-    name: Build AppImage (x86_64)
-    runs-on: ubuntu-latest
+    name: Build AppImage (${{ matrix.arch }})
+    needs: [validate-and-test]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -182,47 +239,29 @@ jobs:
       - name: Install build tools & dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y meson ninja-build file wget libgtk-4-dev libadwaita-1-dev
+          sudo apt-get install -y \
+            meson \
+            ninja-build \
+            file \
+            wget \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            python3-gi \
+            python3-gi-cairo \
+            libgirepository1.0-dev
 
-      - name: Stage AppDir
-        run: |
-          APPDIR="$(pwd)/AppDir"
-          mkdir -p "$APPDIR"
-          meson setup _build_appdir --prefix=/usr
-          DESTDIR="$APPDIR" meson install -C _build_appdir
-
-          # Setup AppDir root metadata
-          cp data/io.github.the0megastar.Glyph.desktop "$APPDIR/"
-          cp data/icons/io.github.the0megastar.Glyph.svg "$APPDIR/io.github.the0megastar.Glyph.svg"
-          cp "$APPDIR/io.github.the0megastar.Glyph.svg" "$APPDIR/.DirIcon"
-
-          # Create AppRun entrypoint
-          cat <<'EOF' > "$APPDIR/AppRun"
-          #!/bin/sh
-          SELF=$(readlink -f "$0")
-          HERE=${SELF%/*}
-          export PATH="${HERE}/usr/bin:${PATH}"
-          export PYTHONPATH="${HERE}/usr/lib/python3/dist-packages:${HERE}/usr/lib/python3/site-packages:${PYTHONPATH}"
-          export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
-          exec "${HERE}/usr/bin/glyph" "$@"
-          EOF
-          chmod +x "$APPDIR/AppRun"
-
-      - name: Download AppImageTool and generate AppImage
+      - name: Build Real Runtime AppImage
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
-            VERSION="0.1.1"
+            VERSION=$(PYTHONPATH=src python3 -c "import glyph; print(glyph.__version__)")
           fi
-          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
-          chmod +x appimagetool
-          ./appimagetool --appimage-extract
-          ARCH=x86_64 ./squashfs-root/AppRun AppDir "Glyph-${VERSION}.AppImage"
+          ARCH="${{ matrix.arch }}" VERSION="${VERSION}" ./scripts/build_appimage.sh
 
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: appimage
+          name: appimage-${{ matrix.arch }}
           path: Glyph-*.AppImage
 
   publish-release:
@@ -230,6 +269,9 @@ jobs:
     needs: [build-flatpak, build-deb-rpm, build-appimage]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -240,10 +282,21 @@ jobs:
         run: |
           ls -lh release-assets/
 
+      - name: Write Release Step Summary
+        run: |
+          echo "### 📦 Release Binaries Published" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact | Target | Architecture |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
+          for f in release-assets/*; do
+            filename=$(basename "$f")
+            echo "| \`$filename\` | Release Asset | Multi |" >> $GITHUB_STEP_SUMMARY
+          done
+
       - name: Upload Release Binaries to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: release-assets/*
+          body_path: docs/RELEASE_v0.1.3.md
           draft: false
           prerelease: false
           generate_release_notes: true

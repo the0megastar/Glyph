@@ -14,3 +14,9 @@ meson.add_devenv({'PYTHONPATH': meson.project_source_root() / 'src'})
 
 subdir('src')
 subdir('data')
+
+test_env = {'PYTHONPATH': meson.project_source_root() / 'src'}
+test('test-paths', python, args: [files('tests/test_paths.py')], env: test_env)
+test('test-overrides', python, args: [files('tests/test_overrides.py')], env: test_env)
+test('test-catalog', python, args: [files('tests/test_catalog.py')], env: test_env)
+test('test-ui', python, args: [files('tests/test_ui.py')], env: test_env)

@@ -3,10 +3,13 @@ import io
 import json
 from pathlib import Path
 import stat
+import sys
 import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import glyph.overrides as ov
 from glyph.overrides import (
@@ -22,6 +25,7 @@ from glyph.overrides import (
     restore_all_to_stock,
     restore_stock_launcher,
     revert_all_icons,
+    revert_all_names,
     revert_icon,
     revert_name,
     save_state,
@@ -234,7 +238,11 @@ class TestOverrides(unittest.TestCase):
             names = tar.getnames()
             self.assertIn("manifest.json", names)
             self.assertTrue(any(n.startswith("icons/") for n in names))
-            manifest = json.loads(tar.extractfile("manifest.json").read().decode("utf-8"))
+            manifest_file = tar.extractfile("manifest.json")
+            if manifest_file is None:
+                self.fail("Backup manifest.json must be a readable file")
+            with manifest_file:
+                manifest = json.loads(manifest_file.read().decode("utf-8"))
             self.assertEqual(manifest["version"], 2)
             self.assertIn("app1.desktop", manifest["entries"])
             self.assertEqual(manifest["entries"]["app1.desktop"]["name"], "App 1 Custom")
@@ -332,6 +340,155 @@ class TestOverrides(unittest.TestCase):
             load_state()
         self.assertTrue(self.state_file.is_file())
         self.assertIn("corrupt", self.state_file.read_text(encoding="utf-8"))
+
+    def test_bulk_names_preserves_icon_and_other_fields(self):
+        p = self.app_dir / "demo.desktop"
+        p.write_text("[Desktop Entry]\nType=Application\nName=Original\nExec=/bin/true\nIcon=orig-icon\n", encoding="utf-8")
+        apply_icon("demo.desktop", str(p), str(self.sample_png))
+        apply_name("demo.desktop", str(p), "Custom Name")
+
+        res = revert_all_names()
+        self.assertEqual(res.completed, 1)
+        self.assertEqual(res.errors, {})
+
+        content = p.read_text(encoding="utf-8")
+        self.assertIn("Name=Original", content)
+        self.assertIn("Icon=", content)
+        self.assertNotIn("Custom Name", content)
+
+        state = load_state()
+        self.assertIn("demo.desktop", state)
+        self.assertIn("icon_path", state["demo.desktop"])
+        self.assertNotIn("custom_name", state["demo.desktop"])
+
+    def test_bulk_reverts_order_independence(self):
+        # Test 1: Revert names first, then icons
+        p1 = self.app_dir / "app1.desktop"
+        p1.write_text("[Desktop Entry]\nName=App1\nIcon=icon1\n", encoding="utf-8")
+        apply_icon("app1.desktop", str(p1), str(self.sample_png))
+        apply_name("app1.desktop", str(p1), "Named1")
+
+        res_n = revert_all_names()
+        self.assertEqual(res_n.completed, 1)
+        self.assertIn("Name=App1", p1.read_text(encoding="utf-8"))
+
+        res_i = revert_all_icons()
+        self.assertEqual(res_i.completed, 1)
+        self.assertIn("Icon=icon1", p1.read_text(encoding="utf-8"))
+
+        # Test 2: Revert icons first, then names
+        p2 = self.app_dir / "app2.desktop"
+        p2.write_text("[Desktop Entry]\nName=App2\nIcon=icon2\n", encoding="utf-8")
+        apply_icon("app2.desktop", str(p2), str(self.sample_png))
+        apply_name("app2.desktop", str(p2), "Named2")
+
+        res_i2 = revert_all_icons()
+        self.assertEqual(res_i2.completed, 1)
+        self.assertIn("Icon=icon2", p2.read_text(encoding="utf-8"))
+        self.assertIn("Name=Named2", p2.read_text(encoding="utf-8"))
+
+        res_n2 = revert_all_names()
+        self.assertEqual(res_n2.completed, 1)
+        self.assertIn("Name=App2", p2.read_text(encoding="utf-8"))
+
+    def test_legacy_created_override_undo_removes_copy(self):
+        stock = self.stock_dir / "stock.desktop"
+        stock.write_text("[Desktop Entry]\nName=Stock\nExec=/bin/true\n", encoding="utf-8")
+        p = self.app_dir / "stock.desktop"
+        p.write_text("[Desktop Entry]\nName=Custom\nExec=/bin/true\n", encoding="utf-8")
+
+        legacy = {
+            "stock.desktop": {
+                "created_local": True,
+                "local_desktop": str(p),
+                "source_path": str(stock),
+                "original_name": "Stock",
+                "custom_name": "Custom",
+            }
+        }
+        self.state_file.write_text(json.dumps(legacy), encoding="utf-8")
+        revert_name("stock.desktop")
+        self.assertFalse(p.exists(), "v0.1.2 created override remains after its state is discarded")
+
+    def test_legacy_created_override_undo_preserves_when_externally_edited(self):
+        stock = self.stock_dir / "stock2.desktop"
+        stock.write_text("[Desktop Entry]\nName=Stock2\nExec=/bin/true\n", encoding="utf-8")
+        p = self.app_dir / "stock2.desktop"
+        # User manually added Comment=External
+        p.write_text("[Desktop Entry]\nName=Custom\nExec=/bin/true\nComment=External\n", encoding="utf-8")
+
+        legacy = {
+            "stock2.desktop": {
+                "created_local": True,
+                "local_desktop": str(p),
+                "source_path": str(stock),
+                "original_name": "Stock2",
+                "custom_name": "Custom",
+            }
+        }
+        self.state_file.write_text(json.dumps(legacy), encoding="utf-8")
+        revert_name("stock2.desktop")
+        # Should not delete file because it has external comments not in stock
+        self.assertTrue(p.exists())
+        self.assertIn("Comment=External", p.read_text(encoding="utf-8"))
+        self.assertIn("Name=Stock2", p.read_text(encoding="utf-8"))
+
+    def test_write_failure_rolls_back_files(self):
+        p = self.app_dir / "rollback.desktop"
+        p.write_text("[Desktop Entry]\nType=Application\nName=Demo\nExec=/bin/true\nIcon=demo\n", encoding="utf-8")
+        before = p.read_bytes()
+        original_atomic = ov._atomic
+        failed = False
+
+        def write(path, data, mode=0o644):
+            nonlocal failed
+            if path == ov.STATE_FILE and not failed:
+                failed = True
+                raise OSError("simulated state write failure")
+            return original_atomic(path, data, mode)
+
+        with patch.object(ov, "_atomic", side_effect=write):
+            with self.assertRaises(OverrideError):
+                apply_name(p.name, str(p), "Changed")
+        self.assertEqual(p.read_bytes(), before)
+        self.assertEqual(load_state(), {})
+        self.assertFalse(ov._journal_path().exists())
+
+    def test_revert_detects_external_edit(self):
+        p = self.app_dir / "ext.desktop"
+        p.write_text("[Desktop Entry]\nType=Application\nName=Demo\nExec=/bin/true\nIcon=demo\n", encoding="utf-8")
+        apply_name(p.name, str(p), "Custom")
+        p.write_text(p.read_text(encoding="utf-8") + "Comment=External\n", encoding="utf-8")
+        before = p.read_bytes()
+        with self.assertRaises(OverrideError):
+            revert_name(p.name)
+        self.assertEqual(p.read_bytes(), before)
+
+    def test_directory_escape_backup_rejected(self):
+        target = self.root / "bad.tar.gz"
+        with tarfile.open(target, "w:gz") as archive:
+            member = tarfile.TarInfo("../outside")
+            member.size = 0
+            archive.addfile(member, io.BytesIO())
+        with self.assertRaises(OverrideError):
+            preview_backup(target)
+
+    def test_missing_import_is_reported_without_state_loss(self):
+        p = self.app_dir / "keep.desktop"
+        p.write_text("[Desktop Entry]\nType=Application\nName=Keep\nExec=/bin/true\nIcon=keep\n", encoding="utf-8")
+        apply_name(p.name, str(p), "Keep")
+
+        target = self.root / "missing.tar.gz"
+        payload = json.dumps({"version": 2, "entries": {"absent.desktop": {"name": "Absent"}}}).encode()
+        with tarfile.open(target, "w:gz") as archive:
+            member = tarfile.TarInfo("manifest.json")
+            member.size = len(payload)
+            archive.addfile(member, io.BytesIO(payload))
+
+        with patch.object(ov, "find_stock", return_value=""):
+            result = import_backup(target)
+        self.assertEqual(result.skipped, ["absent.desktop"])
+        self.assertEqual(load_state()[p.name]["custom_name"], "Keep")
 
 
 if __name__ == "__main__":

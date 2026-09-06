@@ -8,7 +8,8 @@ import shutil
 
 from gi.repository import Gio
 
-from glyph.paths import data_home, find_stock, stock_dirs
+import glyph.paths as paths
+from glyph.paths import data_home, desktop_index, find_stock, stock_dirs
 
 
 @dataclass
@@ -36,8 +37,8 @@ def get_stock_application_dirs() -> list[Path]:
     return stock_dirs()
 
 
-def find_stock_desktop_file(desktop_id: str) -> str:
-    return find_stock(desktop_id)
+def find_stock_desktop_file(desktop_id: str, index: dict[str, Path] | None = None) -> str:
+    return find_stock(desktop_id, index=index)
 
 
 def classify_source(path: str) -> str:
@@ -133,6 +134,7 @@ def _resolve_app_folder(info: Gio.DesktopAppInfo) -> str:
 def list_apps(overrides: dict[str, dict]) -> list[AppEntry]:
     seen: set[str] = set()
     apps: list[AppEntry] = []
+    stock_index = paths.desktop_index(paths.stock_dirs())
 
     for info in Gio.AppInfo.get_all():
         if not isinstance(info, Gio.DesktopAppInfo):
@@ -161,7 +163,7 @@ def list_apps(overrides: dict[str, dict]) -> list[AppEntry]:
         custom = custom_icon or custom_name
         original_name = override.get("original_name", "")
 
-        stock_filename = find_stock_desktop_file(desktop_id)
+        stock_filename = find_stock_desktop_file(desktop_id, index=stock_index)
         has_stock = bool(stock_filename)
         is_local_file = (str(USER_APPLICATIONS_DIR) in filename) or ("/.local/share/applications/" in filename.replace("\\", "/"))
 

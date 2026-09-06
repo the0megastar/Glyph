@@ -16,7 +16,9 @@ def in_flatpak() -> bool:
 
 def stock_dirs() -> list[Path]:
     defaults = "/usr/local/share:/usr/share"
-    roots = [Path(p) for p in os.environ.get("XDG_DATA_DIRS", defaults).split(":") if p and Path(p).is_absolute()]
+    raw = os.environ.get("XDG_DATA_DIRS")
+    val = raw if (raw is not None and raw != "") else defaults
+    roots = [Path(p) for p in val.split(":") if p and Path(p).is_absolute()]
     if in_flatpak():
         # Runtime launchers are not host applications. Host roots precede exports.
         roots = [Path('/run/host/usr/local/share'), Path('/run/host/usr/share')] + [
@@ -43,6 +45,9 @@ def desktop_index(directories: list[Path]) -> dict[str, Path]:
     return result
 
 
-def find_stock(desktop_id: str) -> str:
-    path = desktop_index(stock_dirs()).get(desktop_id)
+def find_stock(desktop_id: str, index: dict[str, Path] | None = None) -> str:
+    if index is not None:
+        path = index.get(desktop_id)
+    else:
+        path = desktop_index(stock_dirs()).get(desktop_id)
     return str(path) if path else ''

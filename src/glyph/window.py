@@ -31,6 +31,7 @@ def _primary_menu_button() -> Gtk.MenuButton:
 
     overrides_section = Gio.Menu()
     overrides_section.append("Revert All Custom Icons…", "app.revert-all")
+    overrides_section.append("Revert All Custom Names…", "app.revert-all-names")
     overrides_section.append("Restore All to System Default…", "app.restore-all-stock")
     overrides_section.append("Export Overrides…", "app.export-overrides")
     overrides_section.append("Restore Overrides…", "app.import-overrides")
@@ -140,7 +141,13 @@ class GlyphWindow(Adw.ApplicationWindow):
         return Adw.NavigationPage(title="Glyph", child=toolbar)
 
     def reload(self) -> None:
-        self._apps = list_apps(load_state())
+        try:
+            state = load_state()
+        except OverrideError as exc:
+            if hasattr(self, "_toast"):
+                self._toast(str(exc))
+            return
+        self._apps = list_apps(state)
         self._update_filter_menu()
         self._rebuild_list()
         if self._detail_id and getattr(self, "_detail_page", None) is not None:
@@ -438,10 +445,10 @@ class GlyphWindow(Adw.ApplicationWindow):
         self._open_desktop_file.set_sensitive(bool(app.filename))
         self._app_folder_row.set_subtitle(app.app_folder or "Unknown")
         can_launch = bool(app.command or app.filename)
-        if in_flatpak() and app.source == "System":
+        if in_flatpak():
             can_launch = False
-            self._command_row.set_tooltip_text("Launching host applications is not supported from within Flatpak sandbox")
-            self._launch_btn.set_tooltip_text("Launching host applications is not supported from within Flatpak sandbox")
+            self._command_row.set_tooltip_text("Launching external applications is not supported from within Flatpak sandbox")
+            self._launch_btn.set_tooltip_text("Launching external applications is not supported from within Flatpak sandbox")
         else:
             self._command_row.set_tooltip_text(None)
             self._launch_btn.set_tooltip_text("Launch application")
@@ -457,8 +464,8 @@ class GlyphWindow(Adw.ApplicationWindow):
             return
 
         dialog = Adw.AlertDialog(
-            heading=f"Rename {app.name}",
-            body="Enter a new display name for this application.",
+            heading=f"Edit display name for {app.name}",
+            body="Enter a new display name. This will customize how the application appears in your application grid and menus.",
         )
         entry = Gtk.Entry(text=app.name)
         entry.set_activates_default(True)
@@ -466,7 +473,6 @@ class GlyphWindow(Adw.ApplicationWindow):
 
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("rename", "Rename")
-        dialog.set_response_appearance("rename", Adw.ResponseAppearance.SUGGESTED)
         dialog.set_default_response("rename")
         dialog.set_close_response("cancel")
 
@@ -591,7 +597,11 @@ class GlyphWindow(Adw.ApplicationWindow):
 
         def on_response(_d, response):
             if response == "restore":
-                restore_stock_launcher(app.desktop_id)
+                try:
+                    restore_stock_launcher(app.desktop_id)
+                except OverrideError as exc:
+                    self._toast(str(exc))
+                    return
                 self.reload()
                 self._toast(f"Restored default launcher for {app.name}.")
 
@@ -605,8 +615,8 @@ class GlyphWindow(Adw.ApplicationWindow):
         if app is None:
             return
 
-        if in_flatpak() and app.source == "System":
-            self._toast("Launching host applications is not supported from within Flatpak sandbox.")
+        if in_flatpak():
+            self._toast("Launching external applications is not supported from within Flatpak sandbox.")
             return
 
         info = Gio.DesktopAppInfo.new(app.desktop_id)

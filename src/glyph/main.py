@@ -25,12 +25,14 @@ from gi.repository import Adw, Gdk, Gio, Gtk  # noqa: E402
 from glyph import __version__  # noqa: E402
 from glyph.overrides import (  # noqa: E402
     DATA_DIR,
+    OverrideError,
     export_backup,
     import_backup,
     load_state,
     preview_backup,
     restore_all_to_stock,
     revert_all_icons,
+    revert_all_names,
 )
 from glyph.window import GlyphWindow  # noqa: E402
 
@@ -108,6 +110,7 @@ class GlyphApplication(Adw.Application):
         self.create_action("search", self.on_search, ["<primary>f"])
         self.create_action("refresh-help", self.on_refresh_help)
         self.create_action("revert-all", self.on_revert_all)
+        self.create_action("revert-all-names", self.on_revert_all_names)
         self.create_action("restore-all-stock", self.on_restore_all_stock)
         self.create_action("export-overrides", self.on_export_overrides)
         self.create_action("import-overrides", self.on_import_overrides)
@@ -144,7 +147,12 @@ class GlyphApplication(Adw.Application):
 
     def on_revert_all(self, *_args):
         win = self.props.active_window
-        state = load_state()
+        try:
+            state = load_state()
+        except OverrideError as exc:
+            if win and hasattr(win, "_toast"):
+                win._toast(str(exc))
+            return
         count = sum(bool(record.get("icon_path")) for record in state.values())
         if count == 0:
             if win and hasattr(win, "_toast"):
@@ -176,6 +184,45 @@ class GlyphApplication(Adw.Application):
         dialog.connect("response", on_response)
         dialog.present(win)
 
+    def on_revert_all_names(self, *_args):
+        win = self.props.active_window
+        try:
+            state = load_state()
+        except OverrideError as exc:
+            if win and hasattr(win, "_toast"):
+                win._toast(str(exc))
+            return
+        count = sum(bool(record.get("custom_name")) for record in state.values())
+        if count == 0:
+            if win and hasattr(win, "_toast"):
+                win._toast("No custom names to revert.")
+            return
+
+        dialog = Adw.AlertDialog(
+            heading="Revert all custom names?",
+            body=(
+                f"This will restore original names for {count} application{'s' if count != 1 else ''} "
+                "while preserving custom icons and pre-existing launchers."
+            ),
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("revert", "Revert All")
+        dialog.set_response_appearance("revert", Adw.ResponseAppearance.DESTRUCTIVE)
+
+        def on_response(_d, response):
+            if response == "revert":
+                res = revert_all_names()
+                if win and hasattr(win, "reload"):
+                    win.reload()
+                if win and hasattr(win, "_toast"):
+                    msg = f"Restored original names for {res.completed} application{'s' if res.completed != 1 else ''}. Log out to refresh grid."
+                    if res.errors:
+                        msg += f" ({len(res.errors)} failed)"
+                    win._toast(msg)
+
+        dialog.connect("response", on_response)
+        dialog.present(win)
+
     def on_restore_all_stock(self, *_args):
         win = self.props.active_window
         dialog = Adw.AlertDialog(
@@ -195,7 +242,12 @@ class GlyphApplication(Adw.Application):
 
         def on_response(_d, response):
             if response == "restore":
-                res = restore_all_to_stock()
+                try:
+                    res = restore_all_to_stock()
+                except OverrideError as exc:
+                    if win and hasattr(win, "_toast"):
+                        win._toast(str(exc))
+                    return
                 if win and hasattr(win, "reload"):
                     win.reload()
                 if win and hasattr(win, "_toast"):
@@ -209,7 +261,12 @@ class GlyphApplication(Adw.Application):
 
     def on_export_overrides(self, *_args):
         win = self.props.active_window
-        state = load_state()
+        try:
+            state = load_state()
+        except OverrideError as exc:
+            if win and hasattr(win, "_toast"):
+                win._toast(str(exc))
+            return
         if not state:
             if win and hasattr(win, "_toast"):
                 win._toast("No customizations to export.")

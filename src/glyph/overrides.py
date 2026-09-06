@@ -481,12 +481,24 @@ def _revert(desktop_id: str, key: str) -> None:
     if not record.get('icon_path') and not record.get('custom_name'):
         # Remove only an unchanged Glyph-created copy. Compare key order
         # independently, since key replacement can reposition Name and Icon.
-        original = record.get('original_text')
-        if record.get('created_local') and original is not None:
-            def normalized(value):
-                return _replace_lines(_replace_lines(value, 'Icon', []), 'Name', []), _snapshot_lines(value, 'Icon'), _snapshot_lines(value, 'Name')
-            if normalized(text) == normalized(original):
-                writes[local] = None
+        if record.get('created_local'):
+            original = record.get('original_text')
+            if original is None:
+                src_path = Path(record.get('source_path', ''))
+                if not (src_path.is_file() and src_path != local):
+                    stock_found = find_stock(desktop_id)
+                    if stock_found:
+                        src_path = Path(stock_found)
+                if src_path.is_file() and src_path != local:
+                    try:
+                        original = _read(src_path, MAX_DESKTOP_BYTES).decode('utf-8', errors='replace')
+                    except Exception:
+                        original = None
+            if original is not None:
+                def normalized(value):
+                    return _replace_lines(_replace_lines(value, 'Icon', []), 'Name', []), _snapshot_lines(value, 'Icon'), _snapshot_lines(value, 'Name')
+                if normalized(text) == normalized(original):
+                    writes[local] = None
         del state[desktop_id]
     else:
         record['last_hash'] = _digest(text.encode())

@@ -1,7 +1,11 @@
 import os
 from pathlib import Path
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from glyph.paths import data_home, desktop_index, find_stock, in_flatpak, stock_dirs
 
@@ -95,6 +99,20 @@ class TestPaths(unittest.TestCase):
 
             index = desktop_index([root])
             self.assertEqual(index["foo-bar.desktop"], root / "foo-bar.desktop")
+
+    def test_empty_xdg_data_dirs_uses_spec_defaults(self):
+        with patch.dict(os.environ, {"XDG_DATA_DIRS": ""}), patch("glyph.paths.in_flatpak", return_value=False):
+            dirs = stock_dirs()
+            self.assertEqual(dirs[:2], [Path("/usr/local/share/applications"), Path("/usr/share/applications")])
+
+    def test_find_stock_with_index(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            launcher = root / "app.desktop"
+            launcher.write_text("[Desktop Entry]\nName=Test\n", encoding="utf-8")
+            custom_index = {"app.desktop": launcher}
+            self.assertEqual(find_stock("app.desktop", index=custom_index), str(launcher))
+            self.assertEqual(find_stock("missing.desktop", index=custom_index), "")
 
 
 if __name__ == "__main__":
