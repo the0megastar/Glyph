@@ -110,6 +110,27 @@ Glyph is built using GTK4 and Libadwaita, and follows FreeDesktop.org (XDG) stan
 
 ---
 
+## Security & Permissions
+
+Glyph is engineered from the ground up to protect your system integrity and privacy.
+
+- **100% Offline and Private**  
+  Glyph does not connect to the internet, contains zero telemetry, and collects no personal data.
+
+- **Non-Destructive User Space Overrides**  
+  Glyph never writes to root or system directories (`/usr`, `/var`, `/etc`). All customizations live strictly inside your personal user profile (`~/.local/share/applications/` and `~/.local/share/glyph/`).
+
+- **Read-Only Host Discovery (`host-os ro`)**  
+  Standalone Flatpak packages use read-only host filesystem access exclusively to inspect installed application launchers (`/usr/share/applications`) and their icons. This allows Glyph to discover and customize native RPM, DEB, Pacman, and AUR packages safely without needing root privileges.
+
+- **Flatpak Scoped Access**  
+  Read-only access to system and user Flatpak directories (`/var/lib/flatpak` and `~/.local/share/flatpak`) allows reading launcher entries and resolving application assets.
+
+- **Native Desktop Portals**  
+  File selection dialogs run through native desktop portals, ensuring the sandbox only receives access to the specific image files you select.
+
+---
+
 ## Building from Source
 
 If you want to hack on Glyph, contribute, or build it yourself:
