@@ -589,31 +589,6 @@ class GlyphWindow(Adw.ApplicationWindow):
         if app is None:
             return
 
-        if Path("/.flatpak-info").exists():
-            target_id = app.desktop_id
-            if not target_id and app.filename:
-                target_id = Path(app.filename).name
-            try:
-                subprocess.Popen(
-                    ["flatpak-spawn", "--host", "gtk-launch", target_id],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                self._toast(f"Launched {app.name}.")
-                return
-            except Exception:
-                try:
-                    subprocess.Popen(
-                        ["flatpak-spawn", "--host", "gio", "launch", app.filename or app.desktop_id],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                    )
-                    self._toast(f"Launched {app.name}.")
-                    return
-                except Exception as exc:
-                    self._toast(f"Failed to launch on host: {exc}")
-                    return
-
         info = Gio.DesktopAppInfo.new(app.desktop_id)
         if not info and app.filename:
             info = Gio.DesktopAppInfo.new_from_filename(app.filename)

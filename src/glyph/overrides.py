@@ -169,16 +169,6 @@ def _unlink_glyph_icon(path: Path | None) -> None:
 def refresh_desktop_database(path: Path | None = None) -> None:
     target = path or APPLICATIONS_DIR
     target.mkdir(parents=True, exist_ok=True)
-    if Path("/.flatpak-info").exists():
-        try:
-            subprocess.run(
-                ["flatpak-spawn", "--host", "update-desktop-database", str(target)],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-        except Exception:
-            pass
     try:
         subprocess.run(
             ["update-desktop-database", str(target)],
@@ -186,7 +176,7 @@ def refresh_desktop_database(path: Path | None = None) -> None:
             capture_output=True,
             text=True,
         )
-    except FileNotFoundError:
+    except (FileNotFoundError, PermissionError):
         pass
     try:
         os.utime(target, None)
