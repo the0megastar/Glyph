@@ -119,6 +119,7 @@ jobs:
             ninja-build \
             libgtk-4-dev \
             libadwaita-1-dev \
+            python-gi-dev \
             python3-gi \
             python3-gi-cairo \
             libgirepository1.0-dev \
