@@ -388,6 +388,20 @@ def _prepare(state: dict, desktop_id: str, source_desktop: str):
     return local, text, record
 
 
+def _is_valid_image_header(data: bytes, suffix: str) -> bool:
+    s = suffix.lower()
+    if s == '.png':
+        return data.startswith(b'\x89PNG\r\n\x1a\n')
+    if s in ('.jpg', '.jpeg'):
+        return data.startswith(b'\xff\xd8\xff')
+    if s == '.webp':
+        return len(data) >= 12 and data.startswith(b'RIFF') and data[8:12] == b'WEBP'
+    if s == '.svg':
+        sample = data[:4096].decode('utf-8', errors='ignore').lower()
+        return '<svg' in sample
+    return False
+
+
 def validate_image(data: bytes, suffix: str) -> None:
     if suffix.lower() not in ALLOWED_SUFFIXES or not data or len(data) > MAX_IMAGE_BYTES:
         raise OverrideError('Choose a PNG, SVG, JPEG or WebP image up to 10 MiB.')
@@ -403,6 +417,13 @@ def validate_image(data: bytes, suffix: str) -> None:
         if loader.get_pixbuf() is None:
             raise OverrideError('The selected file is not a readable image.')
     except GLib.Error as exc:
+        msg = str(exc.message or '')
+        is_sandbox_blocked = any(
+            hint in msg
+            for hint in ('bwrap', 'glycin', 'Loader process exited early', 'Operation not permitted')
+        )
+        if is_sandbox_blocked and _is_valid_image_header(data, suffix):
+            return
         raise OverrideError(f'The selected image cannot be decoded: {exc.message}') from exc
 
 

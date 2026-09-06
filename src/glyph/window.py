@@ -26,7 +26,7 @@ def _image_from_gicon(gicon: Gio.Icon | None, pixel_size: int) -> Gtk.Image:
     return image
 
 
-def _primary_menu_button() -> Gtk.MenuButton:
+def _primary_menu_model() -> Gio.Menu:
     menu = Gio.Menu()
 
     overrides_section = Gio.Menu()
@@ -47,10 +47,14 @@ def _primary_menu_button() -> Gtk.MenuButton:
     about_section.append("About Glyph", "app.about")
     menu.append_section(None, about_section)
 
+    return menu
+
+
+def _primary_menu_button() -> Gtk.MenuButton:
     return Gtk.MenuButton(
         icon_name="open-menu-symbolic",
         tooltip_text="Main menu",
-        menu_model=menu,
+        menu_model=_primary_menu_model(),
         primary=True,
     )
 

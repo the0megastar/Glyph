@@ -75,7 +75,7 @@ class TestUI(unittest.TestCase):
             has_stock=False,
             gicon=None,
         )
-        with patch("glyph.window.in_flatpak", return_value=True):
+        with patch("glyph.window.in_flatpak", return_value=True), patch("glyph.window.Gtk.Label"):
             window.GlyphWindow._fill_detail(stub, app)
             # In flatpak, launch should be disabled and show informative tooltip
             stub._launch_btn.set_sensitive.assert_called_with(False)
@@ -84,8 +84,7 @@ class TestUI(unittest.TestCase):
             )
 
     def test_primary_menu_contains_revert_all_names(self):
-        button = window._primary_menu_button()
-        menu_model = button.get_menu_model()
+        menu_model = window._primary_menu_model()
         self.assertIsNotNone(menu_model)
         # Search for app.revert-all-names action in menu sections
         found = False
