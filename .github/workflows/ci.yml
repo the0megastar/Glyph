@@ -74,14 +74,15 @@ jobs:
             python3-gobject-devel \
             gtk4-devel \
             libadwaita-devel \
-            desktop-file-utils
+            desktop-file-utils \
+            git
 
       - name: Build RPM Package
         run: |
           VERSION="0.1.3"
           RPM_TOP="$HOME/rpmbuild"
           mkdir -p "$RPM_TOP"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-          tar --exclude='.git' -czf "$RPM_TOP/SOURCES/glyph-${VERSION}.tar.gz" -C .. $(basename $(pwd))
+          tar --exclude='.git' --exclude='_build*' --exclude='.flatpak-builder' --transform "s,^\.,glyph-${VERSION}," -czf "$RPM_TOP/SOURCES/glyph-${VERSION}.tar.gz" .
           cp packaging/rpm/glyph.spec "$RPM_TOP/SPECS/"
           rpmbuild -ba "$RPM_TOP/SPECS/glyph.spec"
           RPM_FILE=$(find "$RPM_TOP/RPMS" -name "glyph-${VERSION}-*.rpm" | head -n 1)
