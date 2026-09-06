@@ -24,7 +24,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=16">
+  <link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body>
   <!-- Sticky HeaderBar / Navbar -->
@@ -38,6 +38,7 @@
       <ul class="nav-links">
         <li><a href="#showcase" class="nav-link">Showcase</a></li>
         <li><a href="#features" class="nav-link">Features</a></li>
+        <li><a href="#security" class="nav-link">Security</a></li>
         <li><a href="#install" class="nav-link">Install</a></li>
         <li><a href="#releases" class="nav-link">Releases</a></li>
         <li><a href="#support" class="nav-link">Support</a></li>
@@ -350,6 +351,80 @@
       </div>
     </section>
 
+    <!-- Security & Privacy Section -->
+    <section class="security-section" id="security">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Privacy &amp; Security</div>
+          <h2 class="section-title">Engineered for Peace of Mind</h2>
+          <p class="section-desc">Full desktop freedom with zero compromises to your system integrity or personal privacy.</p>
+        </div>
+
+        <div class="security-grid">
+          <div class="security-card">
+            <div class="security-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <path d="M9 12l2 2 4-4"></path>
+              </svg>
+            </div>
+            <div class="security-card-content">
+              <h3 class="security-card-title">100% Offline &amp; Private</h3>
+              <p class="security-card-text">
+                Zero internet permissions, zero telemetry, and zero analytics. No background network requests ever leave your machine. Your application habits stay completely private.
+              </p>
+            </div>
+          </div>
+
+          <div class="security-card">
+            <div class="security-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </div>
+            <div class="security-card-content">
+              <h3 class="security-card-title">Non-Destructive User Space</h3>
+              <p class="security-card-text">
+                Never touches or modifies root files in <code>/usr</code> or <code>/var</code>. Overrides live strictly in standard <code>~/.local/share/applications</code> and can be cleanly reverted at any time.
+              </p>
+            </div>
+          </div>
+
+          <div class="security-card">
+            <div class="security-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
+            <div class="security-card-content">
+              <h3 class="security-card-title">Read-Only Discovery</h3>
+              <p class="security-card-text">
+                Filesystem access to system and Flatpak folders is strictly read-only. It is used exclusively to discover installed <code>.desktop</code> launchers and display application icons across RPM, DEB, AUR, and Flatpak.
+              </p>
+            </div>
+          </div>
+
+          <div class="security-card">
+            <div class="security-icon-box">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+            </div>
+            <div class="security-card-content">
+              <h3 class="security-card-title">Desktop Portal Isolation</h3>
+              <p class="security-card-text">
+                File chooser dialogs execute through native FreeDesktop portals. Glyph only receives temporary access to the specific image files you manually choose in the system picker.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Dedicated Installation Section -->
     <section class="install-section" id="install">
       <div class="container">
@@ -520,6 +595,6 @@
   </footer>
 
   <!-- App Script -->
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>
