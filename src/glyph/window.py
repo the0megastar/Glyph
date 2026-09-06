@@ -4,6 +4,7 @@ import subprocess
 from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
 
 from glyph.catalog import AppEntry, list_apps
+from glyph.paths import in_flatpak
 from glyph.overrides import (
     OverrideError,
     apply_icon,
@@ -437,6 +438,13 @@ class GlyphWindow(Adw.ApplicationWindow):
         self._open_desktop_file.set_sensitive(bool(app.filename))
         self._app_folder_row.set_subtitle(app.app_folder or "Unknown")
         can_launch = bool(app.command or app.filename)
+        if in_flatpak() and app.source == "System":
+            can_launch = False
+            self._command_row.set_tooltip_text("Launching host applications is not supported from within Flatpak sandbox")
+            self._launch_btn.set_tooltip_text("Launching host applications is not supported from within Flatpak sandbox")
+        else:
+            self._command_row.set_tooltip_text(None)
+            self._launch_btn.set_tooltip_text("Launch application")
         self._command_row.set_subtitle(app.command or "No command")
         self._command_row.set_activatable(can_launch)
         self._launch_btn.set_sensitive(can_launch)
@@ -505,8 +513,12 @@ class GlyphWindow(Adw.ApplicationWindow):
         app = self._find(self._detail_id)
         if app is None:
             return False
+        source_desktop = app.filename or app.stock_filename
+        if not source_desktop:
+            self._toast("No desktop file found to override.")
+            return False
         try:
-            apply_icon(app.desktop_id, app.filename, path)
+            apply_icon(app.desktop_id, source_desktop, path)
         except OverrideError as exc:
             self._toast(str(exc))
             return False
@@ -537,8 +549,12 @@ class GlyphWindow(Adw.ApplicationWindow):
         app = self._find(self._detail_id)
         if app is None:
             return
+        source_desktop = app.filename or app.stock_filename
+        if not source_desktop:
+            self._toast("No desktop file found to override.")
+            return
         try:
-            apply_icon(app.desktop_id, app.filename, file.get_path())
+            apply_icon(app.desktop_id, source_desktop, file.get_path())
         except OverrideError as exc:
             self._toast(str(exc))
             return
@@ -587,6 +603,10 @@ class GlyphWindow(Adw.ApplicationWindow):
             return
         app = self._find(self._detail_id)
         if app is None:
+            return
+
+        if in_flatpak() and app.source == "System":
+            self._toast("Launching host applications is not supported from within Flatpak sandbox.")
             return
 
         info = Gio.DesktopAppInfo.new(app.desktop_id)

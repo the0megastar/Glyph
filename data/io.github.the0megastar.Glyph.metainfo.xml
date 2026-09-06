@@ -45,6 +45,18 @@
   </screenshots>
 
   <releases>
+    <release version="0.1.3" date="2026-09-06">
+      <description>
+        <p>Transactional safety, portable v2 backups, and desktop ID compliance:</p>
+        <ul>
+          <li>Introduced write-ahead transaction logging with crash recovery to ensure atomic launcher, icon, and state persistence</li>
+          <li>New portable v2 backup format storing relative icon assets, full custom display names, and interactive conflict detection</li>
+          <li>Safe bulk revert operations that preserve custom display names and pre-existing user launchers</li>
+          <li>Full support for nested desktop IDs and localized Name[locale] preservation across renames and rollbacks</li>
+          <li>Hardened native packaging dependencies requiring GTK 4.10 and Libadwaita 1.5</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.2" date="2026-09-05">
       <description>
         <p>Hardened Flatpak permissions and least-privilege compliance:</p>

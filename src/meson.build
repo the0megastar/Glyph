@@ -8,6 +8,7 @@ python.install_sources(
     'glyph/window.py',
     'glyph/catalog.py',
     'glyph/overrides.py',
+    'glyph/paths.py',
   ],
   preserve_path: true,
 )

@@ -8,6 +8,8 @@ import shutil
 
 from gi.repository import Gio
 
+from glyph.paths import data_home, find_stock, stock_dirs
+
 
 @dataclass
 class AppEntry:
@@ -27,37 +29,15 @@ class AppEntry:
     original_name: str = ""
 
 
-XDG_DATA_HOME = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
-USER_APPLICATIONS_DIR = XDG_DATA_HOME / "applications"
+USER_APPLICATIONS_DIR = data_home() / "applications"
 
 
 def get_stock_application_dirs() -> list[Path]:
-    dirs: list[Path] = [
-        Path("/run/host/usr/share/applications"),
-        Path("/run/host/usr/local/share/applications"),
-        Path("/usr/share/applications"),
-        Path("/usr/local/share/applications"),
-        Path("/var/lib/flatpak/exports/share/applications"),
-        Path.home() / ".local/share/flatpak/exports/share/applications",
-        Path("/var/lib/snapd/desktop/applications"),
-    ]
-    xdg_dirs = os.environ.get("XDG_DATA_DIRS", "")
-    for d in xdg_dirs.split(":"):
-        d = d.strip()
-        if d:
-            candidate = Path(d) / "applications"
-            if candidate not in dirs and candidate.is_dir():
-                dirs.append(candidate)
-    return dirs
+    return stock_dirs()
 
 
 def find_stock_desktop_file(desktop_id: str) -> str:
-    name = desktop_id if desktop_id.endswith(".desktop") else f"{desktop_id}.desktop"
-    for directory in get_stock_application_dirs():
-        candidate = directory / name
-        if candidate.is_file():
-            return str(candidate)
-    return ""
+    return find_stock(desktop_id)
 
 
 def classify_source(path: str) -> str:

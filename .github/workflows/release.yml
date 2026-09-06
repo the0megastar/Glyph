@@ -94,7 +94,7 @@ jobs:
           Priority: optional
           Architecture: all
           Maintainer: the0megastar <https://github.com/the0megastar/Glyph>
-          Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, desktop-file-utils
+          Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0 (>= 4.10), gir1.2-adw-1 (>= 1.5), desktop-file-utils
           Description: Customize application launcher icons and names on Linux
            A modern desktop utility for Linux to browse installed applications,
            customize launcher icons and display names safely at the user level,
@@ -130,7 +130,7 @@ jobs:
           License:        GPL-3.0
           URL:            https://github.com/the0megastar/Glyph
           BuildArch:      noarch
-          Requires:       python3, gtk4, libadwaita, python3-gobject, desktop-file-utils
+          Requires:       python3 >= 3.10, gtk4 >= 4.10, libadwaita >= 1.5, python3-gobject, desktop-file-utils
 
           %description
           A modern desktop utility for Linux to browse installed applications,
@@ -140,6 +140,13 @@ jobs:
           %install
           mkdir -p %{buildroot}
           cp -r $(pwd)/_pkg_root/* %{buildroot}/
+          for d in %{buildroot}/usr/lib/python*/dist-packages; do
+            if [ -d "$d" ]; then
+              py_dir=$(dirname "$d")
+              mkdir -p "$py_dir/site-packages"
+              cp -r "$d"/* "$py_dir/site-packages/"
+            fi
+          done
 
           %post
           /usr/bin/update-desktop-database &> /dev/null || :
@@ -166,7 +173,7 @@ jobs:
             glyph-*.rpm
 
   build-appimage:
-    name: Build AppImage (x86_64 & aarch64)
+    name: Build AppImage (x86_64)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
