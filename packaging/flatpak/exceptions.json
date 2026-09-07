@@ -2,7 +2,9 @@
   "io.github.the0megastar.Glyph": [
     "finish-args-host-os-ro-filesystem-access",
     "finish-args-flatpak-system-folder-app-ro-access",
+    "finish-args-flatpak-system-folder-exports-share-ro-access",
     "finish-args-flatpak-system-folder-exports-share-applications-ro-access",
-    "finish-args-unnecessary-xdg-data-flatpak-ro-access"
+    "finish-args-unnecessary-xdg-data-flatpak-ro-access",
+    "finish-args-unnecessary-xdg-data-applications-create-access"
   ]
 }
