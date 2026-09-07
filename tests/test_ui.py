@@ -14,6 +14,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Gio, Gtk
 
 from glyph import window
+from glyph import main
 from glyph.overrides import OverrideError
 import glyph.overrides as ov
 
@@ -22,12 +23,24 @@ class TestUI(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="glyph-ui-test-")
         self.root = Path(self.tmp.name)
-        self.state_file = self.root / "overrides.json"
-        p = patch.object(ov, "STATE_FILE", self.state_file)
-        p.start()
-        self.addCleanup(p.stop)
+        self.app_dir = self.root / "applications"
+        self.data_dir = self.root / "glyph"
+        self.icons_dir = self.data_dir / "icons"
+        self.state_file = self.data_dir / "overrides.json"
+        self.patchers = [
+            patch.object(ov, "APPLICATIONS_DIR", self.app_dir),
+            patch.object(ov, "DATA_DIR", self.data_dir),
+            patch.object(ov, "ICONS_DIR", self.icons_dir),
+            patch.object(ov, "STATE_FILE", self.state_file),
+            patch.object(ov, "refresh_desktop_database"),
+        ]
+        for path_patcher in self.patchers:
+            path_patcher.start()
+        ov._ensure_dirs()
 
     def tearDown(self):
+        for path_patcher in reversed(self.patchers):
+            path_patcher.stop()
         self.tmp.cleanup()
 
     def test_ui_reload_handles_damaged_state(self):
@@ -83,20 +96,49 @@ class TestUI(unittest.TestCase):
                 "Launching external applications is not supported from within Flatpak sandbox"
             )
 
-    def test_primary_menu_contains_revert_all_names(self):
+    def test_primary_menu_contains_reset_submenu_and_preferences(self):
         menu_model = window._primary_menu_model()
         self.assertIsNotNone(menu_model)
-        # Search for app.revert-all-names action in menu sections
-        found = False
-        for s in range(menu_model.get_n_items()):
-            section = menu_model.get_item_link(s, Gio.MENU_LINK_SECTION)
-            if section:
-                for i in range(section.get_n_items()):
-                    action = section.get_item_attribute_value(i, Gio.MENU_ATTRIBUTE_ACTION)
-                    if action and action.get_string() == "app.revert-all-names":
-                        found = True
-                        break
-        self.assertTrue(found, "app.revert-all-names must be in primary menu")
+
+        def contains_action(model, expected):
+            for index in range(model.get_n_items()):
+                action = model.get_item_attribute_value(index, Gio.MENU_ATTRIBUTE_ACTION)
+                if action and action.get_string() == expected:
+                    return True
+                for link_name in (Gio.MENU_LINK_SECTION, Gio.MENU_LINK_SUBMENU):
+                    child = model.get_item_link(index, link_name)
+                    if child and contains_action(child, expected):
+                        return True
+            return False
+
+        self.assertTrue(contains_action(menu_model, "app.revert-all-names"))
+        self.assertTrue(contains_action(menu_model, "app.preferences"))
+
+        reset_section = menu_model.get_item_link(1, Gio.MENU_LINK_SECTION)
+        self.assertIsNotNone(reset_section)
+        self.assertIsNotNone(reset_section.get_item_link(0, Gio.MENU_LINK_SUBMENU))
+
+    def test_import_rejects_non_local_backup(self):
+        toasts = []
+        win = SimpleNamespace(_toast=toasts.append)
+        app = SimpleNamespace(props=SimpleNamespace(active_window=win))
+        dialog = MagicMock()
+        dialog.open_finish.return_value.get_path.return_value = None
+
+        main.GlyphApplication._on_import_open_done(app, dialog, MagicMock())
+
+        self.assertEqual(toasts, ["The selected backup is not available as a local file."])
+
+    def test_open_app_folder_launches_directory(self):
+        launcher = MagicMock()
+        stub = SimpleNamespace(
+            _detail_id="demo.desktop",
+            _find=lambda _desktop_id: SimpleNamespace(app_folder="/usr/bin"),
+            _on_open_folder_done=MagicMock(),
+        )
+        with patch.object(window.Gtk.FileLauncher, "new", return_value=launcher):
+            window.GlyphWindow._on_open_app_folder(stub, MagicMock())
+        launcher.launch.assert_called_once_with(stub, None, stub._on_open_folder_done)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,11 @@
 from pathlib import Path
 import subprocess
 
-from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
+import gi
+
+gi.require_version("GioUnix", "2.0")
+
+from gi.repository import Adw, Gdk, Gio, GioUnix, GLib, GObject, Gtk, Pango
 
 from glyph.catalog import AppEntry, list_apps
 from glyph.paths import in_flatpak
@@ -30,19 +34,25 @@ def _primary_menu_model() -> Gio.Menu:
     menu = Gio.Menu()
 
     overrides_section = Gio.Menu()
-    overrides_section.append("Revert All Custom Icons…", "app.revert-all")
-    overrides_section.append("Revert All Custom Names…", "app.revert-all-names")
-    overrides_section.append("Restore All to System Default…", "app.restore-all-stock")
     overrides_section.append("Export Overrides…", "app.export-overrides")
     overrides_section.append("Restore Overrides…", "app.import-overrides")
     overrides_section.append("Open Data Folder in Files", "app.open-data-folder")
     menu.append_section(None, overrides_section)
+
+    reset_menu = Gio.Menu()
+    reset_menu.append("Revert All Custom Icons…", "app.revert-all")
+    reset_menu.append("Revert All Custom Names…", "app.revert-all-names")
+    reset_menu.append("Restore All to System Defaults…", "app.restore-all-stock")
+    reset_section = Gio.Menu()
+    reset_section.append_submenu("Reset Overrides", reset_menu)
+    menu.append_section(None, reset_section)
 
     help_section = Gio.Menu()
     help_section.append("How to Refresh Icons…", "app.refresh-help")
     menu.append_section(None, help_section)
 
     about_section = Gio.Menu()
+    about_section.append("Preferences", "app.preferences")
     about_section.append("Keyboard Shortcuts", "app.shortcuts")
     about_section.append("About Glyph", "app.about")
     menu.append_section(None, about_section)
@@ -254,7 +264,6 @@ class GlyphWindow(Adw.ApplicationWindow):
     def _build_detail_page(self, app: AppEntry) -> Adw.NavigationPage:
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
-        header.pack_end(_primary_menu_button())
         toolbar.add_top_bar(header)
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
@@ -623,11 +632,11 @@ class GlyphWindow(Adw.ApplicationWindow):
             self._toast("Launching external applications is not supported from within Flatpak sandbox.")
             return
 
-        info = Gio.DesktopAppInfo.new(app.desktop_id)
+        info = GioUnix.DesktopAppInfo.new(app.desktop_id)
         if not info and app.filename:
-            info = Gio.DesktopAppInfo.new_from_filename(app.filename)
+            info = GioUnix.DesktopAppInfo.new_from_filename(app.filename)
         if not info and app.stock_filename:
-            info = Gio.DesktopAppInfo.new_from_filename(app.stock_filename)
+            info = GioUnix.DesktopAppInfo.new_from_filename(app.stock_filename)
         if not info:
             self._toast("Could not create launcher.")
             return
@@ -653,7 +662,13 @@ class GlyphWindow(Adw.ApplicationWindow):
         if app is None or not app.app_folder:
             return
         launcher = Gtk.FileLauncher.new(Gio.File.new_for_path(app.app_folder))
-        launcher.open_containing_folder(self, None, self._on_open_file_done)
+        launcher.launch(self, None, self._on_open_folder_done)
+
+    def _on_open_folder_done(self, launcher: Gtk.FileLauncher, result: Gio.AsyncResult) -> None:
+        try:
+            launcher.launch_finish(result)
+        except GLib.GError:
+            self._toast("Could not open Files.")
 
     def _on_open_file_done(self, launcher: Gtk.FileLauncher, result: Gio.AsyncResult) -> None:
         try:
@@ -663,4 +678,3 @@ class GlyphWindow(Adw.ApplicationWindow):
 
     def _toast(self, message: str) -> None:
         self.toast_overlay.add_toast(Adw.Toast(title=message))
-

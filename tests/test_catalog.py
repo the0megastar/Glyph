@@ -10,8 +10,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
+gi.require_version("GioUnix", "2.0")
 # Gio is provided dynamically by PyGObject's introspection importer.
-from gi.repository import Gio  # pyrefly: ignore[missing-module-attribute]
+from gi.repository import Gio, GioUnix  # pyrefly: ignore[missing-module-attribute]
 
 from glyph import catalog
 from glyph import paths
@@ -38,7 +39,7 @@ class TestCatalog(unittest.TestCase):
 
     def test_catalog_builds_one_index_per_reload(self):
         infos = [
-            Gio.DesktopAppInfo.new_from_filename(str(self.launcher(f"demo{i}.desktop")))
+            GioUnix.DesktopAppInfo.new_from_filename(str(self.launcher(f"demo{i}.desktop")))
             for i in range(8)
         ]
         self.assertTrue(all(infos))
@@ -57,7 +58,7 @@ class TestCatalog(unittest.TestCase):
 
     def test_list_apps_applies_overrides(self):
         p = self.launcher("custom.desktop", "[Desktop Entry]\nType=Application\nName=Base\nExec=/bin/true\n")
-        info = Gio.DesktopAppInfo.new_from_filename(str(p))
+        info = GioUnix.DesktopAppInfo.new_from_filename(str(p))
         overrides = {
             "custom.desktop": {
                 "custom_name": "My Custom Name",

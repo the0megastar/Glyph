@@ -81,12 +81,11 @@ Glyph is built using GTK4 and Libadwaita, and follows FreeDesktop.org (XDG) stan
 - **App Details & Quick Launch**: Inspect the resolved **App folder**, **Desktop file**, and start **Command** with buttons to open locations in Files, plus a header **Launch** button to test and preview your launcher in the dash immediately.
 - **Empty States**: Native `Adw.StatusPage` illustrations when searches yield no matches or when no apps have been customized.
 - **Primary Menu**:
-  - **Revert All Custom Icons**: Reset all Glyph icon overrides at once with a confirmation dialog.
-  - **Revert All Custom Names**: Reset all customized display names back to original package names while preserving custom icons.
-  - **Restore All to System Default**: Remove all local launcher overrides shadowing system packages (including manual edits or third-party menu editors) and reset every app to its original package name and icon.
   - **Backup & Restore Overrides**: Export or import your customizations as a portable v2 `.tar.gz` bundle for backups or dotfile synchronization across machines.
+  - **Reset Overrides Submenu**: Keeps bulk icon, name, and system-default reset actions together and away from routine actions.
   - **Open Data Folder in Files**: Inspect `~/.local/share/glyph/` directly.
-  - **Keyboard Shortcuts**: View built-in shortcuts (`Ctrl+F`, `Ctrl+Q`, `Ctrl+?`, `Esc`).
+  - **Preferences**: Follow the system appearance or force light or dark mode (`Ctrl+,`).
+  - **Keyboard Shortcuts**: View built-in shortcuts (`Ctrl+F`, `Ctrl+,`, `Ctrl+Q`, `Ctrl+?`, `Esc`).
 
 ---
 
@@ -183,6 +182,7 @@ Update your desktop database and icon caches if needed:
 ```bash
 update-desktop-database ~/.local/share/applications
 gtk-update-icon-cache ~/.local/share/icons/hicolor
+glib-compile-schemas ~/.local/share/glib-2.0/schemas
 ```
 
 ### 4. Build Local Flatpak
@@ -196,7 +196,7 @@ flatpak run io.github.the0megastar.Glyph
 
 ## Documentation & Testing
 
-- **Testing Guide**: [`docs/TESTING.md`](docs/TESTING.md) — Running the 35 automated unit tests, individual test execution, and container packaging tests.
+- **Testing Guide**: [`docs/TESTING.md`](docs/TESTING.md) — Running the 37 automated unit tests, individual test execution, and container packaging tests.
 - **Least-Privilege Permissions Audit**: [`docs/PERMISSIONS_AUDIT.md`](docs/PERMISSIONS_AUDIT.md) — Detailed review of Flatpak sandbox boundaries and filesystem grants.
 - **Release Notes**: [`docs/RELEASE_v0.1.3.md`](docs/RELEASE_v0.1.3.md) — Feature overview and download links.
 - **Post-Implementation Report**: [`docs/POST_IMPLEMENTATION_STATUS.md`](docs/POST_IMPLEMENTATION_STATUS.md) — Defect-by-defect status matrix against all review findings.

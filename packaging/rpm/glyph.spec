@@ -45,10 +45,12 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 %post
 /usr/bin/update-desktop-database &> /dev/null || :
 /usr/bin/gtk-update-icon-cache %{_datadir}/icons/hicolor &> /dev/null || :
+/usr/bin/glib-compile-schemas %{_datadir}/glib-2.0/schemas &> /dev/null || :
 
 %postun
 /usr/bin/update-desktop-database &> /dev/null || :
 /usr/bin/gtk-update-icon-cache %{_datadir}/icons/hicolor &> /dev/null || :
+/usr/bin/glib-compile-schemas %{_datadir}/glib-2.0/schemas &> /dev/null || :
 
 %files
 %license LICENSE
@@ -58,6 +60,7 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 %{_datadir}/applications/io.github.the0megastar.Glyph.desktop
 %{_datadir}/metainfo/io.github.the0megastar.Glyph.metainfo.xml
 %{_datadir}/icons/hicolor/scalable/apps/io.github.the0megastar.Glyph.svg
+%{_datadir}/glib-2.0/schemas/io.github.the0megastar.Glyph.gschema.xml
 
 %changelog
 * Sun Sep 06 2026 the0megastar <the0megastar@users.noreply.github.com> - 0.1.3-1

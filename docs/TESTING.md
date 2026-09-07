@@ -11,8 +11,8 @@ Glyph contains automated regression and unit tests organized in the `tests/` dir
 | [`tests/test_paths.py`](file:///home/the0megastar/Glyph/tests/test_paths.py) | XDG Base Directory specification compliance, stock directory discovery, desktop ID indexing (flat vs nested), empty/custom `XDG_DATA_DIRS`. | 10 tests |
 | [`tests/test_overrides.py`](file:///home/the0megastar/Glyph/tests/test_overrides.py) | Transaction logging, rollback, single and bulk reverts (icons & names), legacy v0.1.2 migration, backup v2 export/import, traversal rejection. | 19 tests |
 | [`tests/test_catalog.py`](file:///home/the0megastar/Glyph/tests/test_catalog.py) | Application catalog enumeration, single stock index scan per reload, source classification (System, Flatpak, Snap, Local). | 3 tests |
-| [`tests/test_ui.py`](file:///home/the0megastar/Glyph/tests/test_ui.py) | Headless GTK4/Libadwaita UI error boundaries, damaged state handling in `reload()`, Flatpak launch capability restrictions, primary menu actions. | 3 tests |
-| **Total** | | **35 tests** |
+| [`tests/test_ui.py`](file:///home/the0megastar/Glyph/tests/test_ui.py) | Headless GTK4/Libadwaita UI error boundaries, isolated state handling, Flatpak restrictions, menu structure, file imports, and folder launching. | 5 tests |
+| **Total** | | **37 tests** |
 
 ---
 

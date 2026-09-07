@@ -48,7 +48,7 @@ jobs:
           echo "### 🧪 Test Suite Results" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: Passed" >> $GITHUB_STEP_SUMMARY
           echo "- **Python Version**: 3.12" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tests Run**: 35 unit tests (paths, overrides, catalog, UI)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tests Run**: 37 unit tests (paths, overrides, catalog, UI)" >> $GITHUB_STEP_SUMMARY
 
   fedora-rpm-build:
     name: Fedora RPM Build & Clean Install
@@ -152,6 +152,9 @@ jobs:
           fi
           if [ -x /usr/bin/gtk-update-icon-cache ]; then
             gtk-update-icon-cache -q /usr/share/icons/hicolor || true
+          fi
+          if [ -x /usr/bin/glib-compile-schemas ]; then
+            glib-compile-schemas /usr/share/glib-2.0/schemas || true
           fi
           exit 0
           EOF

@@ -125,7 +125,8 @@ def validate_metadata() -> bool:
         if res.returncode == 0:
             print("  [OK] appstreamcli validate passed")
         else:
-            print(f"  [WARN] appstreamcli validate: {res.stderr or res.stdout}")
+            print(f"  [FAIL] appstreamcli validate: {res.stderr or res.stdout}")
+            all_ok = False
     elif shutil.which("appstream-util"):
         res = subprocess.run(
             ["appstream-util", "validate-relax", str(metainfo_file)],
@@ -135,7 +136,8 @@ def validate_metadata() -> bool:
         if res.returncode == 0:
             print("  [OK] appstream-util validate-relax passed")
         else:
-            print(f"  [WARN] appstream-util validate-relax: {res.stderr or res.stdout}")
+            print(f"  [FAIL] appstream-util validate-relax: {res.stderr or res.stdout}")
+            all_ok = False
     else:
         print("  [SKIP] appstreamcli / appstream-util not installed")
 

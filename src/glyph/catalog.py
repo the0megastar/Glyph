@@ -6,7 +6,11 @@ import os
 import shlex
 import shutil
 
-from gi.repository import Gio
+import gi
+
+gi.require_version("GioUnix", "2.0")
+
+from gi.repository import Gio, GioUnix
 
 import glyph.paths as paths
 from glyph.paths import data_home, desktop_index, find_stock, stock_dirs
@@ -55,7 +59,7 @@ def classify_source(path: str) -> str:
 
 
 
-def _icon_value(info: Gio.DesktopAppInfo) -> str:
+def _icon_value(info: GioUnix.DesktopAppInfo) -> str:
     try:
         value = info.get_string("Icon")
     except Exception:
@@ -63,7 +67,7 @@ def _icon_value(info: Gio.DesktopAppInfo) -> str:
     return value or ""
 
 
-def _resolve_app_folder(info: Gio.DesktopAppInfo) -> str:
+def _resolve_app_folder(info: GioUnix.DesktopAppInfo) -> str:
     # 1. Flatpak: check X-Flatpak key or desktop ID
     flatpak_id = None
     try:
@@ -137,11 +141,11 @@ def list_apps(overrides: dict[str, dict]) -> list[AppEntry]:
     stock_index = paths.desktop_index(paths.stock_dirs())
 
     for info in Gio.AppInfo.get_all():
-        if not isinstance(info, Gio.DesktopAppInfo):
+        if not isinstance(info, GioUnix.DesktopAppInfo):
             desktop_id = info.get_id()
             if not desktop_id:
                 continue
-            loaded = Gio.DesktopAppInfo.new(desktop_id)
+            loaded = GioUnix.DesktopAppInfo.new(desktop_id)
             if loaded is None:
                 continue
             info = loaded
@@ -202,4 +206,3 @@ def list_apps(overrides: dict[str, dict]) -> list[AppEntry]:
 
     apps.sort(key=lambda app: app.name.casefold())
     return apps
-

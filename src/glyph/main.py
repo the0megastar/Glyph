@@ -19,6 +19,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
+gi.require_version("GioUnix", "2.0")
 
 from gi.repository import Adw, Gdk, Gio, Gtk  # noqa: E402
 
@@ -55,6 +56,13 @@ SHORTCUTS_UI = """<?xml version="1.0" encoding="UTF-8"?>
                 <property name="visible">True</property>
                 <property name="title">Search applications</property>
                 <property name="accelerator">&lt;primary&gt;f</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title">Preferences</property>
+                <property name="accelerator">&lt;primary&gt;comma</property>
               </object>
             </child>
             <child>
@@ -106,6 +114,9 @@ class GlyphApplication(Adw.Application):
             application_id=APP_ID,
             flags=Gio.ApplicationFlags.DEFAULT_FLAGS,
         )
+        self.settings = Gio.Settings.new(APP_ID)
+        self.settings.connect("changed::color-scheme", self._on_color_scheme_changed)
+        self._apply_color_scheme(self.settings.get_string("color-scheme"))
         self.create_action("quit", lambda *_: self.quit(), ["<primary>q"])
         self.create_action("search", self.on_search, ["<primary>f"])
         self.create_action("refresh-help", self.on_refresh_help)
@@ -115,6 +126,7 @@ class GlyphApplication(Adw.Application):
         self.create_action("export-overrides", self.on_export_overrides)
         self.create_action("import-overrides", self.on_import_overrides)
         self.create_action("open-data-folder", self.on_open_data_folder)
+        self.create_action("preferences", self.on_preferences, ["<primary>comma"])
         self.create_action("shortcuts", self.on_shortcuts, ["<primary>question"])
         self.create_action("about", self.on_about)
 
@@ -129,6 +141,17 @@ class GlyphApplication(Adw.Application):
         win = self.props.active_window
         if win and hasattr(win, "search"):
             win.search.grab_focus()
+
+    def _apply_color_scheme(self, value: str) -> None:
+        schemes = {
+            "default": Adw.ColorScheme.DEFAULT,
+            "light": Adw.ColorScheme.FORCE_LIGHT,
+            "dark": Adw.ColorScheme.FORCE_DARK,
+        }
+        Adw.StyleManager.get_default().set_color_scheme(schemes.get(value, Adw.ColorScheme.DEFAULT))
+
+    def _on_color_scheme_changed(self, settings: Gio.Settings, _key: str) -> None:
+        self._apply_color_scheme(settings.get_string("color-scheme"))
 
 
     def on_refresh_help(self, *_args):
@@ -306,7 +329,12 @@ class GlyphApplication(Adw.Application):
         if not file:
             return
 
-        source_path = Path(file.get_path())
+        local_path = file.get_path()
+        if not local_path:
+            if win and hasattr(win, "_toast"):
+                win._toast("The selected backup is not available as a local file.")
+            return
+        source_path = Path(local_path)
         try:
             plan = preview_backup(source_path)
         except Exception as exc:
@@ -363,6 +391,38 @@ class GlyphApplication(Adw.Application):
         launcher = Gtk.FileLauncher.new(Gio.File.new_for_path(str(DATA_DIR)))
         launcher.launch(win, None, None)
 
+    def on_preferences(self, *_args):
+        dialog = Adw.PreferencesDialog()
+        page = Adw.PreferencesPage()
+        group = Adw.PreferencesGroup(title="Appearance")
+        page.add(group)
+        dialog.add(page)
+
+        selected = self.settings.get_string("color-scheme")
+        first_button = None
+        for title, value in (
+            ("Follow System", "default"),
+            ("Light", "light"),
+            ("Dark", "dark"),
+        ):
+            row = Adw.ActionRow(title=title)
+            button = Gtk.CheckButton()
+            if first_button is None:
+                first_button = button
+            else:
+                button.set_group(first_button)
+            button.set_active(value == selected)
+            button.connect(
+                "toggled",
+                lambda active_button, setting=value: active_button.get_active()
+                and self.settings.set_string("color-scheme", setting),
+            )
+            row.add_suffix(button)
+            row.set_activatable_widget(button)
+            group.add(row)
+
+        dialog.present(self.props.active_window)
+
 
 
     def on_shortcuts(self, *_args):
@@ -385,7 +445,6 @@ class GlyphApplication(Adw.Application):
             copyright="© 2026 the0megastar",
             license_type=Gtk.License.GPL_3_0,
             developers=["the0megastar"],
-            designers=["the0megastar"],
             release_notes_version=__version__,
             release_notes=(
                 "<p>Transactional safety, portable v2 backups, and desktop ID compliance:</p>"

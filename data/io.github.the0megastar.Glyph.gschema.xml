@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="io.github.the0megastar.Glyph" path="/io/github/the0megastar/Glyph/">
+    <key name="color-scheme" type="s">
+      <choices>
+        <choice value="default"/>
+        <choice value="light"/>
+        <choice value="dark"/>
+      </choices>
+      <default>'default'</default>
+      <summary>Application color scheme</summary>
+      <description>Whether Glyph follows the system appearance or forces a light or dark appearance.</description>
+    </key>
+  </schema>
+</schemalist>
