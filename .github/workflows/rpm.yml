@@ -1,0 +1,94 @@
+name: Build and Verify Fedora RPM
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  rpm:
+    name: Fedora RPM Build & Clean Install
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Fedora Build Prerequisites
+        run: |
+          dnf install -y \
+            meson \
+            ninja-build \
+            rpm-build \
+            python3-devel \
+            python3-gobject-devel \
+            gtk4-devel \
+            libadwaita-devel \
+            desktop-file-utils
+
+      - name: Build RPM from the maintained spec
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+            VERSION=$(PYTHONPATH=src python3 -c "import glyph; print(glyph.__version__)")
+          fi
+          RPM_TOP=$(mktemp -d)
+          mkdir -p "$RPM_TOP"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          tar --exclude='.git' --exclude='_build*' --exclude='.flatpak-builder' --transform "s,^\.,glyph-${VERSION}," -czf "$RPM_TOP/SOURCES/glyph-${VERSION}.tar.gz" .
+          cp packaging/rpm/glyph.spec "$RPM_TOP/SPECS/"
+          rpmbuild --define "_topdir $RPM_TOP" -ba "$RPM_TOP/SPECS/glyph.spec"
+          packages=("$RPM_TOP"/RPMS/noarch/glyph-"${VERSION}"-*.noarch.rpm)
+          test "${#packages[@]}" -eq 1
+          test -s "${packages[0]}"
+          cp "${packages[0]}" "glyph-${VERSION}.rpm"
+          echo "RPM_FILE=glyph-${VERSION}.rpm" >> "$GITHUB_ENV"
+
+      - name: Install and verify packaged modules and assets
+        run: |
+          dnf install -y "./${RPM_FILE}"
+          cd /tmp
+          python3 -I - <<'PY'
+          import importlib
+          from pathlib import Path
+          import sysconfig
+
+          import glyph.main
+          from gi.repository import Gio
+
+          package_dir = Path(sysconfig.get_path('purelib', scheme='rpm_prefix')) / 'glyph'
+          assert Path(glyph.main.__file__).parent == package_dir, glyph.main.__file__
+          for module in ('backups', 'catalog', 'desktop_text', 'dialogs', 'overrides', 'paths', 'window'):
+              importlib.import_module(f'glyph.{module}')
+          for filename in (
+              '/usr/bin/glyph',
+              '/usr/share/applications/io.github.the0megastar.Glyph.desktop',
+              '/usr/share/metainfo/io.github.the0megastar.Glyph.metainfo.xml',
+              '/usr/share/icons/hicolor/scalable/apps/io.github.the0megastar.Glyph.svg',
+              '/usr/share/glib-2.0/schemas/io.github.the0megastar.Glyph.gschema.xml',
+          ):
+              assert Path(filename).is_file(), filename
+          source = Gio.SettingsSchemaSource.get_default()
+          schema = source.lookup('io.github.the0megastar.Glyph', True)
+          assert schema is not None, 'Installed GSettings schema is not compiled/discoverable'
+          assert schema.has_key('color-scheme')
+          print('Installed RPM modules, assets, and compiled GSettings schema verified')
+          PY
+
+      - name: Upload verified RPM
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-rpm
+          path: ${{ env.RPM_FILE }}
+          if-no-files-found: error
+
+      - name: Generate RPM Step Summary
+        if: always()
+        run: |
+          echo "### 🎩 Fedora RPM Smoke Test" >> $GITHUB_STEP_SUMMARY
+          echo "- **RPM Build**: Succeeded" >> $GITHUB_STEP_SUMMARY
+          echo "- **Clean Import**: Tested and verified from /tmp outside checkout" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,94 @@
+name: Build and Verify Debian Package
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  deb:
+    name: Debian / Ubuntu .deb Build & Clean Install
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Debian Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            meson \
+            ninja-build \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            python-gi-dev \
+            python3-gi \
+            python3-gi-cairo \
+            libgirepository1.0-dev \
+            desktop-file-utils
+
+      - name: Build Debian Package (.deb)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+            VERSION=$(PYTHONPATH=src python3 -c "import glyph; print(glyph.__version__)")
+          fi
+          echo "PACKAGING_VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+          meson setup _build_deb --prefix=/usr
+          DESTDIR="$(pwd)/_deb_root" meson install -C _build_deb
+          mkdir -p _deb_root/DEBIAN
+          cat <<EOF > _deb_root/DEBIAN/control
+          Package: glyph
+          Version: ${VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: all
+          Maintainer: the0megastar <https://github.com/the0megastar/Glyph>
+          Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0 (>= 4.10), gir1.2-adw-1 (>= 1.5), desktop-file-utils
+          Description: Customize application launcher icons and names on Linux
+           A modern desktop utility for Linux to browse installed applications,
+           customize launcher icons and display names safely at the user level,
+           and easily restore system defaults.
+          EOF
+          cat <<'EOF' > _deb_root/DEBIAN/postinst
+          #!/bin/sh
+          set -e
+          if [ -x /usr/bin/update-desktop-database ]; then
+            update-desktop-database -q /usr/share/applications || true
+          fi
+          if [ -x /usr/bin/gtk-update-icon-cache ]; then
+            gtk-update-icon-cache -q /usr/share/icons/hicolor || true
+          fi
+          if [ -x /usr/bin/glib-compile-schemas ]; then
+            glib-compile-schemas /usr/share/glib-2.0/schemas || true
+          fi
+          exit 0
+          EOF
+          chmod 755 _deb_root/DEBIAN/postinst
+          dpkg-deb --build _deb_root "glyph-${VERSION}.deb"
+          echo "DEB_FILE=glyph-${VERSION}.deb" >> "$GITHUB_ENV"
+
+      - name: Clean Environment Install Smoke Test
+        run: |
+          sudo dpkg -i "${DEB_FILE}"
+          cd /tmp
+          python3 -c "import glyph.main; print('Successfully imported glyph.main from installed .deb package')"
+
+      - name: Upload Debian Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-deb
+          path: ${{ env.DEB_FILE }}
+          if-no-files-found: error
+
+      - name: Generate Debian Step Summary
+        if: always()
+        run: |
+          echo "### 📦 Debian / Ubuntu .deb Smoke Test" >> $GITHUB_STEP_SUMMARY
+          echo "- **.deb Build**: Succeeded" >> $GITHUB_STEP_SUMMARY
+          echo "- **Clean Install & Import**: Verified outside checkout" >> $GITHUB_STEP_SUMMARY

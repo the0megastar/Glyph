@@ -31,7 +31,11 @@ jobs:
 
       - name: Validate Release Version & Metadata
         run: |
-          python3 scripts/validate_release.py --tag "${GITHUB_REF_NAME:-}"
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            python3 scripts/validate_release.py --tag "${GITHUB_REF_NAME}"
+          else
+            python3 scripts/validate_release.py
+          fi
 
       - name: Run Unit Tests
         run: |
@@ -84,137 +88,15 @@ jobs:
           name: flatpak-${{ matrix.arch }}
           path: Glyph-*.flatpak
 
-  build-deb-rpm:
-    name: Build Native Packages (.deb & .rpm)
+  build-deb:
+    name: Build Debian Package (.deb)
     needs: [validate-and-test]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    uses: ./.github/workflows/deb.yml
 
-      - name: Install build tools & dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            meson \
-            ninja-build \
-            rpm \
-            python3-all \
-            python-gi-dev \
-            python3-gi \
-            python3-gi-cairo \
-            libgirepository1.0-dev \
-            libgtk-4-dev \
-            libadwaita-1-dev \
-            desktop-file-utils
-
-      - name: Stage Meson installation
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
-            VERSION=$(PYTHONPATH=src python3 -c "import glyph; print(glyph.__version__)")
-          fi
-          echo "PACKAGING_VERSION=$VERSION" >> $GITHUB_ENV
-          
-          meson setup _build --prefix=/usr
-          DESTDIR="$(pwd)/_pkg_root" meson install -C _build
-
-      - name: Build Debian Packages (.deb)
-        run: |
-          VERSION="${PACKAGING_VERSION:?PACKAGING_VERSION was not set}"
-          DEB_DIR="$(pwd)/_deb_root"
-          mkdir -p "$DEB_DIR"
-          cp -r _pkg_root/* "$DEB_DIR/"
-          mkdir -p "$DEB_DIR/DEBIAN"
-
-          cat <<EOF > "$DEB_DIR/DEBIAN/control"
-          Package: glyph
-          Version: ${VERSION}
-          Section: utils
-          Priority: optional
-          Architecture: all
-          Maintainer: the0megastar <https://github.com/the0megastar/Glyph>
-          Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0 (>= 4.10), gir1.2-adw-1 (>= 1.5), desktop-file-utils
-          Description: Customize application launcher icons and names on Linux
-           A modern desktop utility for Linux to browse installed applications,
-           customize launcher icons and display names safely at the user level,
-           and easily restore system defaults.
-          EOF
-
-          cat <<'EOF' > "$DEB_DIR/DEBIAN/postinst"
-          #!/bin/sh
-          set -e
-          if [ -x /usr/bin/update-desktop-database ]; then
-            update-desktop-database -q /usr/share/applications || true
-          fi
-          if [ -x /usr/bin/gtk-update-icon-cache ]; then
-            gtk-update-icon-cache -q /usr/share/icons/hicolor || true
-          fi
-          exit 0
-          EOF
-          chmod 755 "$DEB_DIR/DEBIAN/postinst"
-
-          dpkg-deb --build "$DEB_DIR" "glyph-${VERSION}.deb"
-
-      - name: Build RPM Packages (.rpm)
-        run: |
-          VERSION="${PACKAGING_VERSION:?PACKAGING_VERSION was not set}"
-          RPM_TOP="$HOME/rpmbuild"
-          mkdir -p "$RPM_TOP"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-
-          # Quote heredoc so shell variables $d, $py_dir are preserved verbatim for rpmbuild
-          cat <<'EOF' > "$RPM_TOP/SPECS/glyph.spec"
-          Name:           glyph
-          Version:        __VERSION__
-          Release:        1%{?dist}
-          Summary:        Customize application launcher icons and names on Linux
-          License:        GPL-3.0-or-later
-          URL:            https://github.com/the0megastar/Glyph
-          BuildArch:      noarch
-          Requires:       python3 >= 3.10, gtk4 >= 4.10, libadwaita >= 1.5, python3-gobject, desktop-file-utils
-
-          %description
-          A modern desktop utility for Linux to browse installed applications,
-          customize launcher icons and display names safely at the user level,
-          and easily restore system defaults.
-
-          %install
-          mkdir -p %{buildroot}
-          cp -r __PKG_ROOT__/* %{buildroot}/
-          for d in %{buildroot}/usr/lib/python*/dist-packages; do
-            if [ -d "$d" ]; then
-              py_dir=$(dirname "$d")
-              mkdir -p "$py_dir/site-packages"
-              cp -r "$d"/* "$py_dir/site-packages/"
-            fi
-          done
-
-          %post
-          /usr/bin/update-desktop-database &> /dev/null || :
-          /usr/bin/gtk-update-icon-cache /usr/share/icons/hicolor &> /dev/null || :
-
-          %files
-          /usr/bin/glyph
-          /usr/lib/python*
-          /usr/share/applications/*.desktop
-          /usr/share/metainfo/*.xml
-          /usr/share/icons/hicolor/*
-          EOF
-
-          sed -i "s|__VERSION__|${VERSION}|g" "$RPM_TOP/SPECS/glyph.spec"
-          sed -i "s|__PKG_ROOT__|$(pwd)/_pkg_root|g" "$RPM_TOP/SPECS/glyph.spec"
-
-          rpmbuild -bb "$RPM_TOP/SPECS/glyph.spec"
-          RPM_FILE=$(find "$RPM_TOP/RPMS" -name "*.rpm" | head -n 1)
-          cp "$RPM_FILE" "glyph-${VERSION}.rpm"
-
-      - name: Upload .deb & .rpm Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-packages
-          path: |
-            glyph-*.deb
-            glyph-*.rpm
+  build-rpm:
+    name: Build Fedora RPM (.rpm)
+    needs: [validate-and-test]
+    uses: ./.github/workflows/rpm.yml
 
   build-appimage:
     name: Build AppImage (${{ matrix.arch }})
@@ -253,16 +135,18 @@ jobs:
             VERSION=$(PYTHONPATH=src python3 -c "import glyph; print(glyph.__version__)")
           fi
           ARCH="${{ matrix.arch }}" VERSION="${VERSION}" ./scripts/build_appimage.sh
+          test -s "Glyph-${VERSION}-${{ matrix.arch }}.AppImage"
 
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
           name: appimage-${{ matrix.arch }}
-          path: Glyph-*.AppImage
+          path: Glyph-*-${{ matrix.arch }}.AppImage
+          if-no-files-found: error
 
   publish-release:
     name: Publish Release Assets
-    needs: [build-flatpak, build-deb-rpm, build-appimage]
+    needs: [build-flatpak, build-deb, build-rpm, build-appimage]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -274,8 +158,22 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Display Release Files
+      - name: Verify Complete Release Asset Set
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+            VERSION=$(PYTHONPATH=src python3 -c "import glyph; print(glyph.__version__)")
+          fi
+          echo "Verifying release assets for version: ${VERSION}"
+          for asset in \
+            "Glyph-${VERSION}-x86_64.flatpak" \
+            "Glyph-${VERSION}-aarch64.flatpak" \
+            "Glyph-${VERSION}-x86_64.AppImage" \
+            "Glyph-${VERSION}-aarch64.AppImage" \
+            "glyph-${VERSION}.deb" \
+            "glyph-${VERSION}.rpm"; do
+            test -s "release-assets/${asset}" || { echo "Missing or empty release asset: release-assets/${asset}" >&2; exit 1; }
+          done
           ls -lh release-assets/
 
       - name: Write Release Step Summary
@@ -288,11 +186,28 @@ jobs:
             echo "| \`$filename\` | Release Asset | Multi |" >> $GITHUB_STEP_SUMMARY
           done
 
+      - name: Determine Release Notes Path
+        id: release_notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
+            VERSION=$(PYTHONPATH=src python3 -c "import glyph; print(glyph.__version__)")
+          fi
+          if [ -f "docs/RELEASE_v${VERSION}.md" ]; then
+            echo "path=docs/RELEASE_v${VERSION}.md" >> "$GITHUB_OUTPUT"
+          elif [ -f "docs/RELEASE_${VERSION}.md" ]; then
+            echo "path=docs/RELEASE_${VERSION}.md" >> "$GITHUB_OUTPUT"
+          elif [ -f "docs/RELEASE_v0.1.3.md" ]; then
+            echo "path=docs/RELEASE_v0.1.3.md" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Upload Release Binaries to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: release-assets/*
-          body_path: docs/RELEASE_v0.1.3.md
+          body_path: ${{ steps.release_notes.outputs.path }}
           draft: false
           prerelease: false
           generate_release_notes: true
