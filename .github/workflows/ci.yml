@@ -270,4 +270,4 @@ jobs:
         run: |
           echo "### 🚀 AppImage (${{ matrix.arch }})" >> $GITHUB_STEP_SUMMARY
           echo "- **Architecture**: ${{ matrix.arch }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Bundled Components**: Python, PyGObject, GTK4, Libadwaita, typelibs, schemas" >> $GITHUB_STEP_SUMMARY
+          echo "- **Format**: Portable Distro-Agnostic AppImage with PNG .DirIcon and pre-flight environment validation" >> $GITHUB_STEP_SUMMARY
