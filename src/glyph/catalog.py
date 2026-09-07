@@ -149,7 +149,7 @@ def _resolve_app_folder(entry: _DesktopEntry) -> str:
     candidate_id = entry.flatpak_id or entry.desktop_id.removesuffix(".desktop")
     if candidate_id:
         deployments = (
-            paths.data_home() / "flatpak/app" / candidate_id / "current/active",
+            paths.host_data_home() / "flatpak/app" / candidate_id / "current/active",
             Path("/var/lib/flatpak/app") / candidate_id / "current/active",
         )
         for deployment in deployments:
@@ -179,8 +179,11 @@ def _gicon(value: str) -> Gio.Icon | None:
     if not value:
         return None
     path = Path(value)
-    if path.is_absolute() and path.is_file():
+    if path.is_absolute():
         return Gio.FileIcon.new(Gio.File.new_for_path(value))
+    # Match DesktopAppInfo's handling of legacy themed icon filenames.
+    if value.endswith(('.png', '.svg', '.xpm')):
+        value = value.rsplit('.', 1)[0]
     return Gio.ThemedIcon.new(value)
 
 

@@ -66,7 +66,11 @@ def confirm_revert_all_icons(parent: Gtk.Widget | None) -> None:
 
     def on_response(_d, response):
         if response == "revert":
-            res = revert_all_icons()
+            try:
+                res = revert_all_icons()
+            except OverrideError as exc:
+                _toast(parent, str(exc))
+                return
             _reload(parent)
             msg = f"Restored original icons for {res.completed} application{'s' if res.completed != 1 else ''}. Log out to refresh grid."
             if res.errors:
@@ -102,7 +106,11 @@ def confirm_revert_all_names(parent: Gtk.Widget | None) -> None:
 
     def on_response(_d, response):
         if response == "revert":
-            res = revert_all_names()
+            try:
+                res = revert_all_names()
+            except OverrideError as exc:
+                _toast(parent, str(exc))
+                return
             _reload(parent)
             msg = f"Restored original names for {res.completed} application{'s' if res.completed != 1 else ''}. Log out to refresh grid."
             if res.errors:
@@ -236,4 +244,3 @@ def handle_import_open_done(parent: Gtk.Widget | None, dlg: Gtk.FileDialog, resu
 def import_overrides_dialog(parent: Gtk.Widget | None) -> None:
     dialog = Gtk.FileDialog(title="Restore Overrides Backup")
     dialog.open(parent, None, lambda dlg, res: handle_import_open_done(parent, dlg, res))
-

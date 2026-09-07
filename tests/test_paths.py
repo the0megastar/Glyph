@@ -1,16 +1,66 @@
 import os
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from glyph.paths import data_home, desktop_index, find_stock, in_flatpak, stock_dirs
+from glyph.paths import data_home, desktop_index, find_stock, host_data_home, in_flatpak, stock_dirs, user_application_dirs
 
 
 class TestPaths(unittest.TestCase):
+    def test_flatpak_customization_updates_host_launcher(self):
+        # Fresh import verifies the real module-level destinations, not patched ones.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = dict(os.environ, HOME=tmp, XDG_DATA_HOME=str(root / 'private'),
+                       HOST_XDG_DATA_HOME=str(root / 'host'), XDG_DATA_DIRS=str(root / 'shared'),
+                       PYTHONPATH=str(Path(__file__).resolve().parent.parent / 'src'))
+            result = subprocess.run([sys.executable, '-B', '-c', '''
+from pathlib import Path
+from unittest.mock import patch
+from glyph import paths
+with patch.object(paths, 'in_flatpak', return_value=True):
+    from glyph import overrides as ov
+    from glyph import catalog
+    host = paths.host_data_home() / 'applications'
+    host.mkdir(parents=True)
+    launcher = host / 'demo.desktop'
+    original = '[Desktop Entry]\\nType=Application\\nName=Original\\nExec=/bin/true\\n'
+    launcher.write_text(original)
+    assert ov.APPLICATIONS_DIR == host
+    with patch.object(ov, 'refresh_desktop_database'):
+        ov.apply_name('demo.desktop', str(launcher), 'Changed')
+        assert 'Name=Changed' in launcher.read_text()
+        apps = {app.desktop_id: app for app in catalog.list_apps(ov.load_state())}
+        assert apps['demo.desktop'].name == 'Changed'
+        ov.revert_name('demo.desktop')
+    assert sorted(launcher.read_text().splitlines()) == sorted(original.splitlines())
+    assert not (paths.data_home() / 'applications/demo.desktop').exists()
+'''], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_flatpak_host_roots(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            host = home / 'custom-data'
+            private = home / '.var/app/glyph/data'
+            export = host / 'flatpak/exports/share/applications'
+            export.mkdir(parents=True)
+            (export / 'demo.desktop').write_text('[Desktop Entry]\nName=Demo\n')
+            with patch('glyph.paths.in_flatpak', return_value=True), patch.object(
+                    Path, 'home', return_value=home), patch.dict(os.environ, {
+                        'XDG_DATA_HOME': str(private), 'HOST_XDG_DATA_HOME': str(host),
+                        'XDG_DATA_DIRS': '/app/share:/usr/share'}):
+                self.assertEqual(user_application_dirs(), [host / 'applications'])
+                self.assertEqual(desktop_index(stock_dirs())['demo.desktop'], export / 'demo.desktop')
+                for value in ('', 'relative'):
+                    with patch.dict(os.environ, {'HOST_XDG_DATA_HOME': value}):
+                        self.assertEqual(host_data_home(), home / '.local/share')
+
     def test_data_home_default(self):
         old = os.environ.get("XDG_DATA_HOME")
         try:

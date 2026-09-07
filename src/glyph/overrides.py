@@ -39,10 +39,10 @@ from glyph.desktop_text import (
     set_icon_value,
     set_name_value,
 )
-from glyph.paths import data_home, desktop_index, find_stock
+from glyph.paths import data_home, desktop_index, find_stock, host_data_home, in_flatpak
 
 XDG_DATA_HOME = data_home()
-APPLICATIONS_DIR = XDG_DATA_HOME / 'applications'
+APPLICATIONS_DIR = host_data_home() / 'applications'
 DATA_DIR = XDG_DATA_HOME / 'glyph'
 ICONS_DIR = DATA_DIR / 'icons'
 STATE_FILE = DATA_DIR / 'overrides.json'
@@ -132,7 +132,8 @@ def _sync_dir(path: Path) -> None:
 
 
 def _journal_path() -> Path:
-    return DATA_DIR / 'transaction.json'
+    # Old Flatpak journals refer to private launchers, not host launchers.
+    return DATA_DIR / ('host-transaction.json' if in_flatpak() else 'transaction.json')
 
 
 def _target(kind: str, relative: str) -> Path:
@@ -151,6 +152,11 @@ def _digest(data: bytes | None) -> str | None:
 
 
 def _restore_journal() -> None:
+    if in_flatpak() and (DATA_DIR / 'transaction.json').exists():
+        raise OverrideError(
+            'An interrupted operation from an older Flatpak build needs recovery. '
+            'Use that build to recover and export your preferences before continuing. '
+            f'Previous data has been preserved in {DATA_DIR}.')
     journal = _journal_path()
     if not journal.exists():
         return
@@ -165,7 +171,7 @@ def _restore_journal() -> None:
             current = _read(path, MAX_BACKUP_BYTES) if path.exists() else None
             if _digest(current) not in (_digest(before), record['after']):
                 raise OverrideError(f'Interrupted operation conflicts with a newer edit to {path}. '
-                                    'Keep transaction.json and resolve this conflict before editing.')
+                                    f'Keep {journal.name} and resolve this conflict before editing.')
             targets.append((path, before, int(record['mode']) & 0o777))
         # Validate everything before restoring anything. Recovery is idempotent.
         for path, before, mode in reversed(targets):
@@ -177,7 +183,7 @@ def _restore_journal() -> None:
         journal.unlink()
         _sync_dir(DATA_DIR)
     except (ValueError, KeyError, TypeError) as exc:
-        raise OverrideError(f'Cannot recover transaction.json: {exc}. Keep this file for recovery.') from exc
+        raise OverrideError(f'Cannot recover {journal.name}: {exc}. Keep this file for recovery.') from exc
 
 
 @contextmanager
@@ -222,7 +228,15 @@ def _validate_state(state) -> dict[str, dict]:
                 raise OverrideError(f'Invalid {key} in override state.')
         if type(record.get('created_local', False)) is not bool:
             raise OverrideError('Invalid ownership in override state.')
-        local = _confined(Path(record.get('local_desktop', '')), APPLICATIONS_DIR)
+        recorded_local = Path(record.get('local_desktop', ''))
+        if (in_flatpak() and recorded_local.is_relative_to(XDG_DATA_HOME / 'applications')
+                and not recorded_local.is_relative_to(APPLICATIONS_DIR)):
+            raise OverrideError(
+                'Preferences from an older Flatpak build refer to private launchers. '
+                'Export them using that build, then move the old overrides.json aside '
+                'and import the backup here. '
+                f'Previous data has been preserved in {DATA_DIR}.')
+        local = _confined(recorded_local, APPLICATIONS_DIR)
         if '-'.join(local.relative_to(APPLICATIONS_DIR).parts) != desktop_id:
             raise OverrideError(f'Launcher path does not match {desktop_id}. Keep overrides.json for recovery.')
         if record.get('icon_path'):
@@ -549,4 +563,3 @@ def revert_all_names() -> BatchResult:
 def restore_all_to_stock() -> BatchResult:
     load_state()
     return _batch([k for k in desktop_index([APPLICATIONS_DIR]) if find_stock(k)], restore_stock_launcher)
-

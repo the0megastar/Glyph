@@ -14,6 +14,14 @@ def in_flatpak() -> bool:
     return Path("/.flatpak-info").is_file()
 
 
+def host_data_home() -> Path:
+    """The desktop's data root, distinct from Flatpak's private data root."""
+    if not in_flatpak():
+        return data_home()
+    value = os.environ.get("HOST_XDG_DATA_HOME", "")
+    return Path(value) if value and Path(value).is_absolute() else Path.home() / ".local/share"
+
+
 def _xdg_data_roots() -> list[Path]:
     defaults = "/usr/local/share:/usr/share"
     raw = os.environ.get("XDG_DATA_DIRS")
@@ -34,7 +42,7 @@ def shared_data_roots() -> list[Path]:
         ]
     roots.extend(
         [
-            data_home() / "flatpak/exports/share",
+            host_data_home() / "flatpak/exports/share",
             Path("/var/lib/flatpak/exports/share"),
             Path("/var/lib/snapd/desktop"),
         ]
@@ -44,12 +52,7 @@ def shared_data_roots() -> list[Path]:
 
 def user_application_dirs() -> list[Path]:
     """Return writable/local launcher roots, highest precedence first."""
-    roots = [data_home() / "applications"]
-    if in_flatpak():
-        # The scoped xdg-data/applications grant exposes the host launcher
-        # directory even though XDG_DATA_HOME is app-specific.
-        roots.append(Path.home() / ".local/share/applications")
-    return list(dict.fromkeys(roots))
+    return [host_data_home() / "applications"]
 
 
 def stock_dirs() -> list[Path]:

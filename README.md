@@ -100,6 +100,18 @@ Glyph is built using GTK4 and Libadwaita, and follows FreeDesktop.org (XDG) stan
 
 ## How Revert Works
 
+In Flatpak, launcher overrides are written to the host's applications directory
+(`$HOST_XDG_DATA_HOME/applications`, or `~/.local/share/applications`). Glyph's
+state and copied icons remain in its private `$XDG_DATA_HOME/glyph` directory.
+Native installations continue to use `$XDG_DATA_HOME/glyph` for state and icons.
+
+If a development Flatpak build saved preferences against private launcher copies,
+the corrected build preserves those files and reports that recovery is needed.
+Use the previous build to export those preferences first (and recover any pending
+transaction). Close it, move its `overrides.json` aside for safekeeping, then open
+the corrected build and import the backup. Do not discard the old data before
+exporting. Old Flatpak transaction journals are never replayed against host launchers.
+
 - If Glyph created the local `.desktop` file, revert **deletes** it so the system or Flatpak entry is used again.
 - If you already had a local `.desktop` file, revert restores only the previous `Icon=` value.
 - "Restore stock" removes the local `.desktop` override completely so the desktop falls back to the original package.

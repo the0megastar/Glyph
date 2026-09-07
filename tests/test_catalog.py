@@ -16,6 +16,16 @@ from glyph import paths
 
 
 class TestCatalog(unittest.TestCase):
+    def test_icon_filename_compatibility(self):
+        for value, expected in [('demo.png', 'demo'), ('demo.svg', 'demo'),
+                                ('demo.xpm', 'demo'), ('demo.jpg', 'demo.jpg'),
+                                ('demo.PNG', 'demo.PNG'), ('demo', 'demo')]:
+            with self.subTest(value=value):
+                self.assertEqual(catalog._gicon(value).get_names()[0], expected)
+        icon = catalog._gicon('/missing/icon.png')
+        self.assertIsInstance(icon, Gio.FileIcon)
+        self.assertEqual(icon.get_file().get_path(), '/missing/icon.png')
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="glyph-catalog-test-")
         self.root = Path(self.tmp.name)

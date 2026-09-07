@@ -40,6 +40,25 @@ def _valid_png_bytes() -> bytes:
 
 
 class TestOverrides(unittest.TestCase):
+    def test_old_flatpak_state_and_journal_are_preserved(self):
+        private = self.root / 'private'
+        old_launcher = private / 'applications/demo.desktop'
+        old_launcher.parent.mkdir(parents=True)
+        old_launcher.write_text('[Desktop Entry]\nName=Old\n')
+        state = json.dumps({'demo.desktop': {'local_desktop': str(old_launcher)}})
+        self.state_file.write_text(state)
+        with patch.object(ov, 'in_flatpak', return_value=True), patch.object(ov, 'XDG_DATA_HOME', private):
+            with self.assertRaisesRegex(OverrideError, 'older Flatpak build'):
+                load_state()
+            self.assertEqual(self.state_file.read_text(), state)
+            old_journal = self.data_dir / 'transaction.json'
+            old_journal.write_text('[]')
+            with self.assertRaisesRegex(OverrideError, 'older Flatpak build'):
+                load_state()
+            self.assertEqual(old_journal.read_text(), '[]')
+            self.assertEqual(ov._journal_path().name, 'host-transaction.json')
+        self.assertEqual(old_launcher.read_text(), '[Desktop Entry]\nName=Old\n')
+
     def setUp(self):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp_dir.name)

@@ -15,11 +15,30 @@ from gi.repository import Gio, Gtk
 
 from glyph import window
 from glyph import main
+from glyph import dialogs
 from glyph.overrides import OverrideError
 import glyph.overrides as ov
 
 
 class TestUI(unittest.TestCase):
+    def test_bulk_reset_execution_error_is_shown(self):
+        for confirm, operation, record in [
+                (dialogs.confirm_revert_all_icons, 'revert_all_icons', {'icon_path': 'icon'}),
+                (dialogs.confirm_revert_all_names, 'revert_all_names', {'custom_name': 'name'})]:
+            with self.subTest(operation=operation):
+                alert = MagicMock()
+                parent = MagicMock()
+                with patch.object(dialogs.Adw, 'AlertDialog', return_value=alert), patch.object(
+                        dialogs, 'load_state', return_value={'demo.desktop': record}), patch.object(
+                        dialogs, operation, side_effect=OverrideError('Cannot read state')) as run:
+                    confirm(parent)
+                    callback = alert.connect.call_args.args[1]
+                    callback(alert, 'cancel')
+                    run.assert_not_called()
+                    callback(alert, 'revert')
+                parent._toast.assert_called_once_with('Cannot read state')
+                parent.reload.assert_not_called()
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="glyph-ui-test-")
         self.root = Path(self.tmp.name)
