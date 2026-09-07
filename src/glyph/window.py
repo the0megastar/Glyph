@@ -523,15 +523,7 @@ class GlyphWindow(Adw.ApplicationWindow):
         self.reload()
         self._toast("Original display name restored.")
 
-    def _on_icon_dropped(self, _target: Gtk.DropTarget, value: object, _x: float, _y: float) -> bool:
-        if not self._detail_id or not isinstance(value, Gio.File):
-            return False
-        path = value.get_path()
-        if not path:
-            return False
-        app = self._find(self._detail_id)
-        if app is None:
-            return False
+    def _apply_icon_path(self, app: AppEntry, path: str) -> bool:
         source_desktop = app.filename or app.stock_filename
         if not source_desktop:
             self._toast("No desktop file found to override.")
@@ -544,6 +536,17 @@ class GlyphWindow(Adw.ApplicationWindow):
         self.reload()
         self._toast("Icon saved. Log out to refresh the app grid.")
         return True
+
+    def _on_icon_dropped(self, _target: Gtk.DropTarget, value: object, _x: float, _y: float) -> bool:
+        if not self._detail_id or not isinstance(value, Gio.File):
+            return False
+        path = value.get_path()
+        if not path:
+            return False
+        app = self._find(self._detail_id)
+        if app is None:
+            return False
+        return self._apply_icon_path(app, path)
 
     def _on_change(self, _button: Gtk.Button) -> None:
         if not self._detail_id:
@@ -565,20 +568,13 @@ class GlyphWindow(Adw.ApplicationWindow):
             return
         if file is None or not self._detail_id:
             return
+        path = file.get_path()
+        if not path:
+            return
         app = self._find(self._detail_id)
         if app is None:
             return
-        source_desktop = app.filename or app.stock_filename
-        if not source_desktop:
-            self._toast("No desktop file found to override.")
-            return
-        try:
-            apply_icon(app.desktop_id, source_desktop, file.get_path())
-        except OverrideError as exc:
-            self._toast(str(exc))
-            return
-        self.reload()
-        self._toast("Icon saved. Log out to refresh the app grid.")
+        self._apply_icon_path(app, path)
 
     def _on_revert(self, _button: Gtk.Button) -> None:
         if not self._detail_id:

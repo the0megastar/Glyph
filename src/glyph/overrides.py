@@ -14,7 +14,15 @@ import hashlib
 import io
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
+
+from glyph.backups import (
+    BackupPlan,
+    _backup_members,
+    export_backup,
+    import_backup,
+    preview_backup,
+)
 import re
 import stat
 import subprocess
@@ -22,6 +30,15 @@ import tarfile
 import tempfile
 import threading
 
+from glyph.desktop_text import (
+    _escape,
+    _replace_lines,
+    _snapshot_lines,
+    get_icon_value,
+    get_name_value,
+    set_icon_value,
+    set_name_value,
+)
 from glyph.paths import data_home, desktop_index, find_stock
 
 XDG_DATA_HOME = data_home()
@@ -48,16 +65,6 @@ class BatchResult:
     completed: int = 0
     errors: dict[str, str] = field(default_factory=dict)
     skipped: list[str] = field(default_factory=list)
-
-
-@dataclass
-class BackupPlan:
-    entries: dict[str, dict]
-    assets: dict[str, bytes]
-    sources: dict[str, str]
-    conflicts: list[str]
-    missing: list[str]
-    legacy: bool = False
 
 
 def _ensure_dirs() -> None:
@@ -202,69 +209,6 @@ def operation(function):
     return wrapped
 
 
-def _snapshot_lines(text: str, key: str) -> list[str]:
-    inside = False
-    result = []
-    for line in text.splitlines(keepends=True):
-        stripped = line.strip()
-        if stripped.startswith('[') and stripped.endswith(']'):
-            inside = stripped == '[Desktop Entry]'
-        elif inside and re.match(r'^' + key + r'(?:\[[^\]]+\])?\s*=', stripped):
-            result.append(line if line.endswith('\n') else line + '\n')
-    return result
-
-
-def _replace_lines(text: str, key: str, replacement: list[str]) -> str:
-    inside = False
-    found_group = False
-    out = []
-    for line in text.splitlines(keepends=True):
-        stripped = line.strip()
-        if stripped.startswith('[') and stripped.endswith(']'):
-            inside = stripped == '[Desktop Entry]'
-            out.append(line if line.endswith('\n') else line + '\n')
-            if inside:
-                if found_group:
-                    raise OverrideError('Desktop file contains duplicate Desktop Entry groups.')
-                found_group = True
-                out.extend(replacement)
-        elif inside and re.match(r'^' + key + r'(?:\[[^\]]+\])?\s*=', stripped):
-            continue
-        else:
-            out.append(line if line.endswith('\n') else line + '\n')
-    if not found_group:
-        raise OverrideError('Desktop file is missing its Desktop Entry group.')
-    return ''.join(out)
-
-
-def _escape(value: str) -> str:
-    return value.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-
-
-def _value(text: str, key: str) -> str:
-    for line in _snapshot_lines(text, key):
-        if line.split('=', 1)[0].strip() == key:
-            value = line.split('=', 1)[1].strip()
-            return re.sub(r'\\([snrt\\])', lambda m: {'s': ' ', 'n': '\n', 'r': '\r', 't': '\t', '\\': '\\'}[m[1]], value)
-    return ''
-
-
-def get_icon_value(text: str) -> str:
-    return _value(text, 'Icon')
-
-
-def get_name_value(text: str) -> str:
-    return _value(text, 'Name')
-
-
-def set_icon_value(text: str, value: str) -> str:
-    return _replace_lines(text, 'Icon', [f'Icon={_escape(value)}\n'])
-
-
-def set_name_value(text: str, value: str) -> str:
-    return _replace_lines(text, 'Name', [f'Name={_escape(value)}\n'])
-
-
 def _validate_state(state) -> dict[str, dict]:
     if not isinstance(state, dict) or len(state) > MAX_ENTRIES:
         raise OverrideError('Invalid override state. Keep overrides.json for recovery.')
@@ -311,6 +255,8 @@ def _commit(state: dict[str, dict], writes: dict[Path, bytes | None]) -> None:
         raise OverrideError('Override state is too large.')
     writes = dict(writes)
     writes[STATE_FILE] = state_bytes
+    if len(writes) > MAX_ENTRIES * 3 + 1:
+        raise OverrideError('Too many files in a single transaction.')
     records = []
     for path, after in writes.items():
         if path == STATE_FILE:
@@ -320,8 +266,24 @@ def _commit(state: dict[str, dict], writes: dict[Path, bytes | None]) -> None:
         else:
             kind, root = 'launcher', APPLICATIONS_DIR
         _confined(path, root)
+        rel = str(path.relative_to(root))
+        if len(path.name.encode('utf-8')) > 255:
+            raise OverrideError(f'Destination filename exceeds maximum length: {path.name}')
+        # Ensure _target can parse and validate this record identically to _restore_journal
+        _target(kind, rel)
+
+        if not path.parent.is_dir():
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                raise OverrideError(f'Cannot create directory for {path}: {exc}') from exc
+        if not os.access(path.parent, os.W_OK | os.X_OK):
+            raise OverrideError(f'Destination directory is not writable: {path.parent}')
+        if path.exists() and not os.access(path, os.W_OK):
+            raise OverrideError(f'Destination file is not writable: {path}')
+
         before = _read(path, MAX_BACKUP_BYTES) if path.exists() else None
-        records.append({'kind': kind, 'relative': str(path.relative_to(root)),
+        records.append({'kind': kind, 'relative': rel,
                         'before': base64.b64encode(before).decode() if before is not None else None,
                         'after': _digest(after),
                         'mode': stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o644})
@@ -432,7 +394,9 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
     writes = {}
     if image is not None:
         validate_image(image, suffix)
-        dest = ICONS_DIR / f'{desktop_id}-{hashlib.sha256(image).hexdigest()[:16]}{suffix.lower()}'
+        id_hash = hashlib.sha256(desktop_id.encode('utf-8')).hexdigest()[:16]
+        img_hash = hashlib.sha256(image).hexdigest()[:16]
+        dest = ICONS_DIR / f'{id_hash}-{img_hash}{suffix.lower()}'
         if not record.get('icon_path'):
             record['original_icon'] = get_icon_value(text)
             record['original_icon_lines'] = _snapshot_lines(text, 'Icon')
@@ -586,148 +550,3 @@ def restore_all_to_stock() -> BatchResult:
     load_state()
     return _batch([k for k in desktop_index([APPLICATIONS_DIR]) if find_stock(k)], restore_stock_launcher)
 
-
-def _backup_members(source: Path) -> dict[str, bytes]:
-    members = {}
-    total = 0
-    with tarfile.open(source, 'r:gz') as archive:
-        for member in archive:
-            name = member.name
-            path = PurePosixPath(name)
-            if path.is_absolute() or '..' in path.parts or '\\' in name or str(path) != name:
-                raise OverrideError('Backup contains an invalid path.')
-            if member.isdir() and name == 'icons':
-                continue  # Legacy export includes this directory entry.
-            if (not member.isfile() or name in members or
-                    not (name in ('manifest.json', 'overrides.json') or
-                         (len(path.parts) == 2 and path.parts[0] == 'icons'))):
-                raise OverrideError('Backup contains an unexpected or duplicate member.')
-            total += member.size
-            limit = MAX_STATE_BYTES if name.endswith('.json') else MAX_IMAGE_BYTES
-            if member.size < 0 or member.size > limit or total > MAX_BACKUP_BYTES or len(members) >= MAX_ENTRIES + 1:
-                raise OverrideError('Backup exceeds the supported size or entry count.')
-            stream = archive.extractfile(member)
-            if stream is None:
-                raise OverrideError('Cannot read backup member.')
-            members[name] = stream.read(limit + 1)
-    return members
-
-
-@operation
-def export_backup(target_path: Path) -> int:
-    state = load_state()
-    entries = {}
-    assets = {}
-    for desktop_id, record in state.items():
-        entry = {}
-        if record.get('custom_name'):
-            entry['name'] = record['custom_name']
-        if record.get('icon_path'):
-            image = Path(record['icon_path'])
-            data = _read(image, MAX_IMAGE_BYTES)
-            asset = 'icons/' + hashlib.sha256(data).hexdigest() + image.suffix.lower()
-            entry['icon'] = asset
-            assets[asset] = data
-        if entry:
-            entries[desktop_id] = entry
-    payload = {'manifest.json': json.dumps({'version': 2, 'entries': entries}, indent=2).encode(), **assets}
-    if sum(map(len, payload.values())) > MAX_BACKUP_BYTES:
-        raise OverrideError('Backup exceeds 100 MiB.')
-    # Prevent an export destination from clobbering live data or a launcher.
-    target_path = target_path.absolute()
-    if target_path.resolve().is_relative_to(DATA_DIR.resolve()) or target_path.resolve().is_relative_to(APPLICATIONS_DIR.resolve()):
-        raise OverrideError('Save the backup outside Glyph data and application directories.')
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    fd, name = tempfile.mkstemp(prefix='.glyph-backup-', dir=target_path.parent)
-    os.close(fd)
-    try:
-        with tarfile.open(name, 'w:gz') as archive:
-            for member, data in payload.items():
-                info = tarfile.TarInfo(member)
-                info.size = len(data)
-                info.mode = 0o644
-                archive.addfile(info, io.BytesIO(data))
-        os.replace(name, target_path)
-    finally:
-        Path(name).unlink(missing_ok=True)
-    return len(entries)
-
-
-@operation
-def preview_backup(source_path: Path) -> BackupPlan:
-    members = _backup_members(source_path)
-    legacy = 'manifest.json' not in members
-    manifest_name = 'overrides.json' if legacy else 'manifest.json'
-    if manifest_name not in members or ('manifest.json' in members and 'overrides.json' in members):
-        raise OverrideError('Backup must contain one supported manifest.')
-    manifest = json.loads(members[manifest_name])
-    if not isinstance(manifest, dict):
-        raise OverrideError('Invalid backup manifest.')
-    if legacy:
-        entries = {}
-        for desktop_id, record in manifest.items():
-            if not isinstance(record, dict):
-                raise OverrideError('Invalid legacy backup record.')
-            entry = {}
-            if record.get('custom_name'):
-                entry['name'] = record['custom_name']
-            if record.get('icon_path'):
-                if not isinstance(record['icon_path'], str):
-                    raise OverrideError('Invalid legacy icon reference.')
-                entry['icon'] = 'icons/' + PurePosixPath(record['icon_path']).name
-            entries[desktop_id] = entry
-    else:
-        if manifest.get('version') != 2 or set(manifest) != {'version', 'entries'}:
-            raise OverrideError('Unsupported backup version.')
-        entries = manifest['entries']
-    if not isinstance(entries, dict) or len(entries) > MAX_ENTRIES:
-        raise OverrideError('Invalid backup entries.')
-    sources = {}
-    missing = []
-    current = load_state()
-    conflicts = []
-    local_index = desktop_index([APPLICATIONS_DIR])
-    for desktop_id, entry in entries.items():
-        _id(desktop_id)
-        if not isinstance(entry, dict) or not entry or set(entry) - {'name', 'icon'}:
-            raise OverrideError('Invalid customization in backup.')
-        if 'name' in entry and (not isinstance(entry['name'], str) or not entry['name'].strip()
-                or len(entry['name']) > 256 or any(ord(c) < 32 for c in entry['name'])):
-            raise OverrideError('Invalid display name in backup.')
-        if 'icon' in entry:
-            asset = entry['icon']
-            if not isinstance(asset, str) or not asset.startswith('icons/') or asset not in members:
-                raise OverrideError('Backup is missing a referenced icon.')
-            validate_image(members[asset], PurePosixPath(asset).suffix)
-        source = str(local_index.get(desktop_id) or find_stock(desktop_id))
-        if source:
-            sources[desktop_id] = source
-            if desktop_id in current or desktop_id in local_index:
-                conflicts.append(desktop_id)
-        else:
-            missing.append(desktop_id)
-    return BackupPlan(entries, {k: v for k, v in members.items() if k.startswith('icons/')},
-                      sources, conflicts, missing, legacy)
-
-
-@operation
-def import_backup(source_path: Path, *, replace_existing: bool = False) -> BatchResult:
-    # Revalidate after confirmation; never trust destination paths stored in JSON.
-    plan = preview_backup(source_path)
-    result = BatchResult(skipped=list(plan.missing))
-    for desktop_id, entry in plan.entries.items():
-        if desktop_id not in plan.sources:
-            continue
-        if desktop_id in plan.conflicts and not replace_existing:
-            result.skipped.append(desktop_id)
-            continue
-        try:
-            asset = entry.get('icon')
-            _apply(load_state(), desktop_id, plan.sources[desktop_id],
-                   image=plan.assets[asset] if asset else None,
-                   suffix=PurePosixPath(asset).suffix if asset else None, name=entry.get('name'))
-            result.completed += 1
-        except OverrideError as exc:
-            result.errors[desktop_id] = str(exc)
-    refresh_desktop_database()
-    return result

@@ -490,6 +490,64 @@ class TestOverrides(unittest.TestCase):
         self.assertEqual(result.skipped, ["absent.desktop"])
         self.assertEqual(load_state()[p.name]["custom_name"], "Keep")
 
+    def test_240_byte_desktop_id_customization_and_undo(self):
+        # Construct desktop_id with exactly 240 bytes: 232 'a's + '.desktop' (8 bytes)
+        desktop_id = "a" * 232 + ".desktop"
+        self.assertEqual(len(desktop_id.encode("utf-8")), 240)
+
+        p = self.app_dir / desktop_id
+        p.write_text("[Desktop Entry]\nType=Application\nName=LongID\nExec=/bin/true\nIcon=longid\n", encoding="utf-8")
+
+        # Apply custom icon and custom name
+        apply_icon(desktop_id, str(p), str(self.sample_png))
+        apply_name(desktop_id, str(p), "Custom Long ID Name")
+
+        state = load_state()
+        self.assertIn(desktop_id, state)
+        icon_path = Path(state[desktop_id]["icon_path"])
+        self.assertTrue(icon_path.is_file())
+        self.assertLessEqual(len(icon_path.name.encode("utf-8")), 255)
+        self.assertEqual(state[desktop_id]["custom_name"], "Custom Long ID Name")
+
+        # Revert icon and name (undo)
+        revert_icon(desktop_id)
+        state_after_icon_revert = load_state()
+        self.assertNotIn("icon_path", state_after_icon_revert[desktop_id])
+        self.assertFalse(icon_path.exists())
+
+        revert_name(desktop_id)
+        state_after_name_revert = load_state()
+        self.assertNotIn(desktop_id, state_after_name_revert)
+
+        # Subsequent operations remain fully usable
+        apply_name(desktop_id, str(p), "Second Custom Name")
+        self.assertEqual(load_state()[desktop_id]["custom_name"], "Second Custom Name")
+
+    def test_failure_recovery_does_not_leave_blocking_journal(self):
+        p = self.app_dir / "recovery_test.desktop"
+        p.write_text("[Desktop Entry]\nType=Application\nName=RecoveryTest\nExec=/bin/true\nIcon=test\n", encoding="utf-8")
+        original_atomic = ov._atomic
+        failed = False
+
+        def failing_atomic(path, data, mode=0o644):
+            nonlocal failed
+            # Allow writing transaction.json, but fail once on the first file write in commit
+            if path != ov._journal_path() and not failed:
+                failed = True
+                raise OSError("simulated I/O disk full error during commit write")
+            return original_atomic(path, data, mode)
+
+        with patch.object(ov, "_atomic", side_effect=failing_atomic):
+            with self.assertRaises(OverrideError):
+                apply_name(p.name, str(p), "Fail Name")
+
+        # Journal must not be left behind
+        self.assertFalse(ov._journal_path().exists(), "Journal must be unlinked after rollback")
+
+        # Subsequent operations must succeed and not be blocked
+        apply_name(p.name, str(p), "Succeed Name")
+        self.assertEqual(load_state()[p.name]["custom_name"], "Succeed Name")
+
 
 if __name__ == "__main__":
     unittest.main()

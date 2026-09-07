@@ -2,18 +2,11 @@ import os
 import sys
 from pathlib import Path
 
-# In Flatpak container, ensure host OS and Flatpak export data directories are available
-# before GLib/Gio applications or desktop files are cataloged.
-if Path("/.flatpak-info").exists():
-    _xdg_dirs = [d for d in os.environ.get("XDG_DATA_DIRS", "/app/share:/usr/share").split(":") if d]
-    for _host_dir in [
-        "/run/host/usr/share",
-        "/run/host/usr/local/share",
-        "/var/lib/flatpak/exports/share",
-    ]:
-        if _host_dir not in _xdg_dirs and Path(_host_dir).is_dir():
-            _xdg_dirs.append(_host_dir)
-    os.environ["XDG_DATA_DIRS"] = ":".join(_xdg_dirs)
+from glyph.paths import configure_xdg_data_dirs
+
+# Configure GLib/GTK before importing it, so icon lookup uses the same host and
+# package-export roots as desktop-file discovery.
+configure_xdg_data_dirs()
 
 import gi
 
@@ -23,18 +16,8 @@ gi.require_version("GioUnix", "2.0")
 
 from gi.repository import Adw, Gdk, Gio, Gtk  # noqa: E402
 
-from glyph import __version__  # noqa: E402
-from glyph.overrides import (  # noqa: E402
-    DATA_DIR,
-    OverrideError,
-    export_backup,
-    import_backup,
-    load_state,
-    preview_backup,
-    restore_all_to_stock,
-    revert_all_icons,
-    revert_all_names,
-)
+from glyph import __version__, dialogs  # noqa: E402
+from glyph.overrides import DATA_DIR, OverrideError  # noqa: E402
 from glyph.window import GlyphWindow  # noqa: E402
 
 APP_ID = "io.github.the0megastar.Glyph"
@@ -155,235 +138,26 @@ class GlyphApplication(Adw.Application):
 
 
     def on_refresh_help(self, *_args):
-        dialog = Adw.AlertDialog(
-            heading="Refreshing icons",
-            body=(
-                "Glyph saves the new launcher icon immediately. GNOME Shell often "
-                "keeps the old image in the app grid until you log out and log back in.\n\n"
-                "Opening the app can show the new icon on the dash for that window. "
-                "Unpinning, pinning, or running desktop-menu update commands does not "
-                "clear the grid cache. Glyph cannot force a refresh."
-            ),
-        )
-        dialog.add_response("ok", "OK")
-        dialog.present(self.props.active_window)
+        dialogs.show_refresh_help(self.props.active_window)
 
     def on_revert_all(self, *_args):
-        win = self.props.active_window
-        try:
-            state = load_state()
-        except OverrideError as exc:
-            if win and hasattr(win, "_toast"):
-                win._toast(str(exc))
-            return
-        count = sum(bool(record.get("icon_path")) for record in state.values())
-        if count == 0:
-            if win and hasattr(win, "_toast"):
-                win._toast("No custom icons to revert.")
-            return
-
-        dialog = Adw.AlertDialog(
-            heading="Revert all custom icons?",
-            body=(
-                f"This will restore original icons for {count} application{'s' if count != 1 else ''} "
-                "while preserving custom names and pre-existing launchers."
-            ),
-        )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("revert", "Revert All")
-        dialog.set_response_appearance("revert", Adw.ResponseAppearance.DESTRUCTIVE)
-
-        def on_response(_d, response):
-            if response == "revert":
-                res = revert_all_icons()
-                if win and hasattr(win, "reload"):
-                    win.reload()
-                if win and hasattr(win, "_toast"):
-                    msg = f"Restored original icons for {res.completed} application{'s' if res.completed != 1 else ''}. Log out to refresh grid."
-                    if res.errors:
-                        msg += f" ({len(res.errors)} failed)"
-                    win._toast(msg)
-
-        dialog.connect("response", on_response)
-        dialog.present(win)
+        dialogs.confirm_revert_all_icons(self.props.active_window)
 
     def on_revert_all_names(self, *_args):
-        win = self.props.active_window
-        try:
-            state = load_state()
-        except OverrideError as exc:
-            if win and hasattr(win, "_toast"):
-                win._toast(str(exc))
-            return
-        count = sum(bool(record.get("custom_name")) for record in state.values())
-        if count == 0:
-            if win and hasattr(win, "_toast"):
-                win._toast("No custom names to revert.")
-            return
-
-        dialog = Adw.AlertDialog(
-            heading="Revert all custom names?",
-            body=(
-                f"This will restore original names for {count} application{'s' if count != 1 else ''} "
-                "while preserving custom icons and pre-existing launchers."
-            ),
-        )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("revert", "Revert All")
-        dialog.set_response_appearance("revert", Adw.ResponseAppearance.DESTRUCTIVE)
-
-        def on_response(_d, response):
-            if response == "revert":
-                res = revert_all_names()
-                if win and hasattr(win, "reload"):
-                    win.reload()
-                if win and hasattr(win, "_toast"):
-                    msg = f"Restored original names for {res.completed} application{'s' if res.completed != 1 else ''}. Log out to refresh grid."
-                    if res.errors:
-                        msg += f" ({len(res.errors)} failed)"
-                    win._toast(msg)
-
-        dialog.connect("response", on_response)
-        dialog.present(win)
+        dialogs.confirm_revert_all_names(self.props.active_window)
 
     def on_restore_all_stock(self, *_args):
-        win = self.props.active_window
-        dialog = Adw.AlertDialog(
-            heading="Restore all launchers to system default?",
-            body=(
-                "This will remove all local launcher overrides in your personal applications "
-                "folder and restore every app to its original stock name and icon as provided "
-                "by the package install.\n\n"
-                "Standalone user applications with no system package will not be affected.\n\n"
-                "Note: If you have a custom GNOME icon theme active (e.g. via GNOME Tweaks), "
-                "applications will display that theme's icons rather than the original vendor graphics."
-            ),
-        )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("restore", "Restore All to Default")
-        dialog.set_response_appearance("restore", Adw.ResponseAppearance.DESTRUCTIVE)
-
-        def on_response(_d, response):
-            if response == "restore":
-                try:
-                    res = restore_all_to_stock()
-                except OverrideError as exc:
-                    if win and hasattr(win, "_toast"):
-                        win._toast(str(exc))
-                    return
-                if win and hasattr(win, "reload"):
-                    win.reload()
-                if win and hasattr(win, "_toast"):
-                    msg = f"Restored {res.completed} launcher{'s' if res.completed != 1 else ''} to system default."
-                    if res.errors:
-                        msg += f" ({len(res.errors)} failed)"
-                    win._toast(msg)
-
-        dialog.connect("response", on_response)
-        dialog.present(win)
+        dialogs.confirm_restore_all_stock(self.props.active_window)
 
     def on_export_overrides(self, *_args):
-        win = self.props.active_window
-        try:
-            state = load_state()
-        except OverrideError as exc:
-            if win and hasattr(win, "_toast"):
-                win._toast(str(exc))
-            return
-        if not state:
-            if win and hasattr(win, "_toast"):
-                win._toast("No customizations to export.")
-            return
-
-        dialog = Gtk.FileDialog(title="Export Overrides Backup")
-        dialog.set_initial_name("glyph-overrides-backup.tar.gz")
-        dialog.save(win, None, self._on_export_save_done)
-
-    def _on_export_save_done(self, dialog: Gtk.FileDialog, result: Gio.AsyncResult):
-        win = self.props.active_window
-        try:
-            file = dialog.save_finish(result)
-        except Exception:
-            return
-        if not file:
-            return
-        try:
-            n = export_backup(Path(file.get_path()))
-            if win and hasattr(win, "_toast"):
-                win._toast(f"Exported {n} customization{'s' if n != 1 else ''}.")
-        except Exception as exc:
-            if win and hasattr(win, "_toast"):
-                win._toast(f"Export failed: {exc}")
+        dialogs.export_overrides_dialog(self.props.active_window)
 
     def on_import_overrides(self, *_args):
-        win = self.props.active_window
-        dialog = Gtk.FileDialog(title="Restore Overrides Backup")
-        dialog.open(win, None, self._on_import_open_done)
+        dialogs.import_overrides_dialog(self.props.active_window)
 
     def _on_import_open_done(self, dialog: Gtk.FileDialog, result: Gio.AsyncResult):
-        win = self.props.active_window
-        try:
-            file = dialog.open_finish(result)
-        except Exception:
-            return
-        if not file:
-            return
+        dialogs.handle_import_open_done(self.props.active_window, dialog, result)
 
-        local_path = file.get_path()
-        if not local_path:
-            if win and hasattr(win, "_toast"):
-                win._toast("The selected backup is not available as a local file.")
-            return
-        source_path = Path(local_path)
-        try:
-            plan = preview_backup(source_path)
-        except Exception as exc:
-            if win and hasattr(win, "_toast"):
-                win._toast(f"Invalid backup: {exc}")
-            return
-
-        def execute_import(replace_existing: bool):
-            try:
-                res = import_backup(source_path, replace_existing=replace_existing)
-                if win and hasattr(win, "reload"):
-                    win.reload()
-                if win and hasattr(win, "_toast"):
-                    msg = f"Restored {res.completed} customization{'s' if res.completed != 1 else ''}."
-                    if res.skipped:
-                        msg += f" ({len(res.skipped)} skipped)"
-                    if res.errors:
-                        msg += f" ({len(res.errors)} failed)"
-                    msg += " Log out to refresh grid."
-                    win._toast(msg)
-            except Exception as exc:
-                if win and hasattr(win, "_toast"):
-                    win._toast(f"Restore failed: {exc}")
-
-        if plan.conflicts:
-            conflict_count = len(plan.conflicts)
-            dialog = Adw.AlertDialog(
-                heading="Replace existing customizations?",
-                body=(
-                    f"This backup contains customizations for {conflict_count} application{'s' if conflict_count != 1 else ''} "
-                    "that already have local overrides.\n\n"
-                    "Do you want to replace existing customizations or skip them?"
-                ),
-            )
-            dialog.add_response("cancel", "Cancel")
-            dialog.add_response("skip", "Skip Existing")
-            dialog.add_response("replace", "Replace All")
-            dialog.set_response_appearance("replace", Adw.ResponseAppearance.DESTRUCTIVE)
-
-            def on_conflict_response(_d, response):
-                if response == "replace":
-                    execute_import(replace_existing=True)
-                elif response == "skip":
-                    execute_import(replace_existing=False)
-
-            dialog.connect("response", on_conflict_response)
-            dialog.present(win)
-        else:
-            execute_import(replace_existing=False)
 
     def on_open_data_folder(self, *_args):
         win = self.props.active_window
