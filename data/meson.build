@@ -22,3 +22,5 @@ install_data(
   'io.github.the0megastar.Glyph.gschema.xml',
   install_dir: get_option('datadir') / 'glib-2.0' / 'schemas',
 )
+
+gnome.post_install(glib_compile_schemas: true)

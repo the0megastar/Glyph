@@ -53,6 +53,7 @@ for schema_dir in /usr/share/glib-2.0/schemas; do
     cp -r "${schema_dir}"/* "${APPDIR}/usr/share/glib-2.0/schemas/" 2>/dev/null || true
   fi
 done
+cp data/io.github.the0megastar.Glyph.gschema.xml "${APPDIR}/usr/share/glib-2.0/schemas/"
 if command -v glib-compile-schemas &>/dev/null; then
   glib-compile-schemas "${APPDIR}/usr/share/glib-2.0/schemas" 2>/dev/null || true
 fi
