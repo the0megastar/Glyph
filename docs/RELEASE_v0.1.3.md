@@ -52,3 +52,15 @@ Glyph v0.1.3 introduces transactional safety, bulk display name restoration, por
 - **Libadwaita**: `>= 1.5`
 - **PyGObject**: `>= 3.42`
 - **Desktop Environment**: GNOME Shell, KDE Plasma, COSMIC, Cinnamon, XFCE, or MATE.
+
+### Arch Linux download
+
+The release workflow now builds a pacman package from the checked-out source using the maintained PKGBUILD and requires a fresh Arch installation check before publication. The package uses `any` architecture metadata; the installation check targets Arch Linux x86_64.
+
+After downloading the package, install it and its declared dependencies with:
+
+```bash
+sudo pacman -U ./glyph-0.1.3-1-any.pkg.tar.zst
+```
+
+This is a direct GitHub release download, not an AUR publication or an update repository. Download subsequent packages manually to update.

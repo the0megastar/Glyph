@@ -85,44 +85,8 @@ jobs:
     uses: ./.github/workflows/deb.yml
 
   arch-pkgbuild-check:
-    name: Arch Linux PKGBUILD Build & Check
-    runs-on: ubuntu-latest
-    container:
-      image: archlinux:latest
-    steps:
-      - name: Update system & install prerequisites
-        run: |
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm \
-            base-devel \
-            meson \
-            ninja \
-            python \
-            python-gobject \
-            gtk4 \
-            libadwaita \
-            desktop-file-utils \
-            git
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Test Arch Meson Build & Test
-        run: |
-          meson setup _build_arch --prefix=/usr
-          meson compile -C _build_arch
-          meson test -C _build_arch --print-errorlogs
-          DESTDIR=/tmp/pkgroot meson install -C _build_arch
-          cd /tmp
-          SITE_DIR=$(echo /tmp/pkgroot/usr/lib/python3.*/site-packages)
-          PYTHONPATH="$SITE_DIR" python3 -c "import glyph.main; print('Arch package layout verified')"
-
-      - name: Generate Arch Step Summary
-        if: always()
-        run: |
-          echo "### 🏔️ Arch Linux Package Build" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: Succeeded" >> $GITHUB_STEP_SUMMARY
-          echo "- **PKGBUILD Syntax**: Verified" >> $GITHUB_STEP_SUMMARY
+    name: Arch Package Build & Clean Install
+    uses: ./.github/workflows/arch.yml
 
   appimage-matrix:
     name: AppImage Bundling (${{ matrix.arch }})

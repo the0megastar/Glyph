@@ -144,9 +144,14 @@ jobs:
           path: Glyph-*-${{ matrix.arch }}.AppImage
           if-no-files-found: error
 
+  build-arch:
+    name: Build Arch Package
+    needs: [validate-and-test]
+    uses: ./.github/workflows/arch.yml
+
   publish-release:
     name: Publish Release Assets
-    needs: [build-flatpak, build-deb, build-rpm, build-appimage]
+    needs: [build-flatpak, build-deb, build-rpm, build-appimage, build-arch]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -157,13 +162,18 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
+          pattern: "{flatpak-*,appimage-*,native-*}"
 
       - name: Verify Complete Release Asset Set
+        env:
+          ARCH_PACKAGE: ${{ needs.build-arch.outputs.package }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
             VERSION=$(PYTHONPATH=src python3 -c "import glyph; print(glyph.__version__)")
           fi
+          PKGREL=$(sed -n 's/^pkgrel=//p' packaging/aur/PKGBUILD)
+          test "$ARCH_PACKAGE" = "glyph-${VERSION}-${PKGREL}-any.pkg.tar.zst"
           echo "Verifying release assets for version: ${VERSION}"
           for asset in \
             "Glyph-${VERSION}-x86_64.flatpak" \
@@ -171,7 +181,8 @@ jobs:
             "Glyph-${VERSION}-x86_64.AppImage" \
             "Glyph-${VERSION}-aarch64.AppImage" \
             "glyph-${VERSION}.deb" \
-            "glyph-${VERSION}.rpm"; do
+            "glyph-${VERSION}.rpm" \
+            "$ARCH_PACKAGE"; do
             test -s "release-assets/${asset}" || { echo "Missing or empty release asset: release-assets/${asset}" >&2; exit 1; }
           done
           ls -lh release-assets/

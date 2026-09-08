@@ -4,6 +4,7 @@ pkgver=0.1.3
 pkgrel=1
 pkgdesc="Customize application launcher icons and names on Linux"
 arch=('any')
+options=('!debug')
 url="https://github.com/the0megastar/Glyph"
 license=('GPL-3.0-or-later')
 depends=(

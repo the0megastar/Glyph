@@ -1,0 +1,89 @@
+name: Build and Verify Arch Package
+on:
+  workflow_call:
+    outputs:
+      package:
+        description: Verified Arch package filename
+        value: ${{ jobs.install.outputs.package }}
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    outputs:
+      package: ${{ steps.package.outputs.package }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --needed --noconfirm base-devel git meson ninja python python-gobject gtk4 libadwaita desktop-file-utils hicolor-icon-theme appstream
+          useradd --create-home builder
+      - name: Validate release metadata
+        shell: bash
+        run: |
+          args=()
+          if [ "$GITHUB_REF_TYPE" = tag ]; then args=(--tag "$GITHUB_REF_NAME"); fi
+          python3 scripts/validate_release.py "${args[@]}"
+      - name: Build maintained PKGBUILD from checkout
+        id: package
+        run: bash scripts/build_arch.sh "$GITHUB_WORKSPACE/arch-output"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch-candidate
+          path: arch-output/*.pkg.tar.zst
+          if-no-files-found: error
+  install:
+    needs: build
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    outputs:
+      package: ${{ needs.build.outputs.package }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: arch-candidate
+          path: arch-output
+      - name: Install in fresh runtime environment
+        env:
+          ARCH_PACKAGE: ${{ needs.build.outputs.package }}
+        run: |
+          pacman -Syu --noconfirm
+          pacman -U --noconfirm "arch-output/$ARCH_PACKAGE"
+          pacman -Qk glyph
+          cd /tmp
+          python3 -I - <<'PY'
+          import importlib
+          from pathlib import Path
+          import subprocess
+          import sysconfig
+          import glyph.main
+          from gi.repository import Gio
+          assert Path(glyph.main.__file__).parent == Path(sysconfig.get_path('purelib')) / 'glyph'
+          for module in ('backups', 'catalog', 'desktop_text', 'dialogs', 'overrides', 'paths', 'window'):
+              importlib.import_module(f'glyph.{module}')
+          for filename in (
+              '/usr/bin/glyph',
+              '/usr/share/applications/io.github.the0megastar.Glyph.desktop',
+              '/usr/share/metainfo/io.github.the0megastar.Glyph.metainfo.xml',
+              '/usr/share/icons/hicolor/scalable/apps/io.github.the0megastar.Glyph.svg',
+              '/usr/share/glib-2.0/schemas/io.github.the0megastar.Glyph.gschema.xml',
+          ):
+              assert Path(filename).is_file(), filename
+              assert subprocess.check_output(['pacman', '-Qqo', filename], text=True).strip() == 'glyph'
+          schema = Gio.SettingsSchemaSource.get_default().lookup('io.github.the0megastar.Glyph', True)
+          assert schema is not None and schema.has_key('color-scheme')
+          print('Arch installed modules, owned assets, and compiled schema verified')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-arch
+          path: arch-output/${{ needs.build.outputs.package }}
+          if-no-files-found: error
+      - name: Report verified package
+        env:
+          ARCH_PACKAGE: ${{ needs.build.outputs.package }}
+        run: echo "Verified Arch package $ARCH_PACKAGE (any metadata; tested on x86_64)" >> "$GITHUB_STEP_SUMMARY"
