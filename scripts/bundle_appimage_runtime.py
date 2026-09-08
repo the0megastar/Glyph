@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import subprocess
+import struct
 import sys
 import sysconfig
 
@@ -20,21 +21,36 @@ copied = set()
 elf_files = []
 
 
+def is_dynamic_elf(path):
+    path = Path(path)
+    if path.suffix in {'.o', '.a'}:
+        return False
+    try:
+        with path.open('rb') as stream:
+            header = stream.read(18)
+            if len(header) < 18 or header[:4] != b'\x7fELF':
+                return False
+            endian = '<' if header[5] == 1 else '>'
+            e_type = struct.unpack(f'{endian}H', header[16:18])[0]
+            return e_type in (2, 3)
+    except OSError:
+        return False
+
+
 def copy(source, destination):
     source, destination = Path(source), Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, destination, follow_symlinks=True)
-    with source.open('rb') as stream:
-        if stream.read(4) == b'\x7fELF':
-            pending.append(source)
-            elf_files.append(destination)
+    if is_dynamic_elf(source):
+        pending.append(source)
+        elf_files.append(destination)
 
 
 def tree(source, destination):
     source = Path(source)
     for path in source.rglob('*'):
         relative = path.relative_to(source)
-        if any(part in {'__pycache__', 'site-packages', 'dist-packages'} for part in relative.parts):
+        if any(part.startswith('config-') or part in {'__pycache__', 'site-packages', 'dist-packages', 'test', 'tests', 'idlelib'} for part in relative.parts):
             continue
         if path.is_file():
             copy(path, destination / relative)
@@ -92,7 +108,12 @@ while pending:
     if source.resolve() in seen:
         continue
     seen.add(source.resolve())
-    output = subprocess.check_output(['ldd', str(source)], text=True)
+    proc = subprocess.run(['ldd', str(source)], capture_output=True, text=True, check=False)
+    output = proc.stdout + proc.stderr
+    if proc.returncode != 0:
+        if 'not a dynamic executable' in output or 'statically linked' in output:
+            continue
+        raise SystemExit(f'ldd failed for {source} (exit {proc.returncode}):\n{output}')
     if 'not found' in output:
         raise SystemExit(f'Unresolved dependency for {source}:\n{output}')
     for name, filename in re.findall(r'(\S+) => (/\S+) \(', output):
@@ -104,7 +125,11 @@ while pending:
 # launched from Glyph. Every extension and dlopen caller can find the bundle.
 for path in elf_files:
     relative = os.path.relpath(lib, path.parent)
-    subprocess.run(['patchelf', '--set-rpath', f'$ORIGIN/{relative}', str(path)], check=True)
+    try:
+        subprocess.run(['patchelf', '--set-rpath', f'$ORIGIN/{relative}', str(path)],
+                       check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as exc:
+        print(f'Warning: patchelf skipped {path}: {exc.stderr.strip()}', file=sys.stderr)
 
 share = appdir / 'usr/share'
 for directory in ('glib-2.0/schemas', 'mime', 'icons/Adwaita', 'icons/hicolor'):
