@@ -1,11 +1,74 @@
 // Glyph Website Interactive Logic
 
-document.addEventListener('DOMContentLoaded', () => {
+if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
   initCopyButtons();
   initDownloadDropdown();
   fetchLatestRelease();
 });
+
+const RELEASE_PAGE = 'https://github.com/the0megastar/Glyph/releases/latest';
+const DOWNLOADS = {
+  downloadFlatpakX86: v => `Glyph-${v}-x86_64.flatpak`,
+  downloadFlatpakArm: v => `Glyph-${v}-aarch64.flatpak`,
+  downloadAppImageX86: v => `Glyph-${v}-x86_64.AppImage`,
+  downloadAppImageArm: v => `Glyph-${v}-aarch64.AppImage`,
+  downloadDeb: v => `glyph-${v}.deb`,
+  downloadRpm: v => `glyph-${v}.rpm`,
+};
+
+function resolveReleaseDownloads(release) {
+  if (typeof release?.tag_name !== 'string' || !/^v?\d+\.\d+\.\d+[\w.+-]*$/.test(release.tag_name)) {
+    throw new Error('Invalid release');
+  }
+  const version = release.tag_name.replace(/^v/, '');
+  const assets = Array.isArray(release.assets) ? release.assets : [];
+  return Object.fromEntries(Object.entries(DOWNLOADS).map(([id, filename]) => {
+    const name = filename(version);
+    const matches = assets.filter(asset => asset?.name === name);
+    const asset = matches.length === 1 ? matches[0] : null;
+    let href = null;
+    try {
+      const url = new URL(asset?.browser_download_url);
+      const expectedPath = `/the0megastar/Glyph/releases/download/${release.tag_name}/${name}`;
+      if (url.origin === 'https://github.com' && !url.username && !url.password &&
+          decodeURIComponent(url.pathname) === expectedPath && !url.search && !url.hash) href = url.href;
+    } catch { /* Missing or malformed assets remain unavailable. */ }
+    return [id, href];
+  }));
+}
+
+function renderReleaseDownloads(downloads, root = document) {
+  for (const id of Object.keys(DOWNLOADS)) {
+    const row = root.getElementById(id);
+    if (!row) continue;
+    const subtitle = row.querySelector('.dropdown-item-sub');
+    if (!row.dataset.description) row.dataset.description = subtitle.textContent;
+    const href = downloads?.[id];
+    if (href || !downloads) {
+      row.href = href || RELEASE_PAGE;
+      row.removeAttribute('aria-disabled');
+      row.removeAttribute('tabindex');
+    } else {
+      row.removeAttribute('href');
+      row.setAttribute('aria-disabled', 'true');
+      row.setAttribute('tabindex', '-1');
+    }
+    subtitle.textContent = href ? row.dataset.description : downloads ?
+      'Not available in this release' : 'View release assets on GitHub';
+  }
+  const primary = root.getElementById('primaryDownloadBtn');
+  const href = downloads?.downloadFlatpakX86;
+  primary.href = href || RELEASE_PAGE;
+  primary.querySelector('span').textContent = href ? 'Download Flatpak · x86_64' : 'View Linux downloads';
+  primary.removeAttribute('aria-label');
+  root.getElementById('downloadStatus').textContent = !downloads ?
+    'Direct downloads could not be checked. View release assets on GitHub.' :
+    Object.values(downloads).some(url => !url) ?
+      'Some packages are unavailable. Older assets may be listed on GitHub.' : '';
+}
+
+if (typeof module !== 'undefined') module.exports = { resolveReleaseDownloads, renderReleaseDownloads };
 
 /* 1. Dark / Light Theme Toggle */
 function initThemeToggle() {
@@ -67,9 +130,11 @@ function initDownloadDropdown() {
   }
 
   function closeDropdown() {
+    const returnFocus = dropdownMenu.contains(document.activeElement);
     dropdownMenu.classList.remove('open');
     splitGroup.classList.remove('dropdown-open');
     toggleBtn.setAttribute('aria-expanded', 'false');
+    if (returnFocus) toggleBtn.focus();
   }
 
   toggleBtn.addEventListener('click', (e) => {
@@ -145,43 +210,18 @@ function initCopyButtons() {
 
 /* 5. Progressive Enhancement: Latest GitHub Release Check & Dynamic Release Notes */
 async function fetchLatestRelease() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    const res = await fetch('https://api.github.com/repos/the0megastar/Glyph/releases/latest');
-    if (!res.ok) return;
+    const res = await fetch('https://api.github.com/repos/the0megastar/Glyph/releases/latest', { signal: controller.signal });
+    if (!res.ok) throw new Error('Release request failed');
     const data = await res.json();
-    if (!data || !data.tag_name) return;
+    renderReleaseDownloads(resolveReleaseDownloads(data));
 
     // 1. Update Hero Version Pill
     const versionPill = document.querySelector('.version-pill');
     if (versionPill) {
       versionPill.textContent = `${data.tag_name} • Native GTK4 & Libadwaita`;
-    }
-
-    // 2. Update Download Dropdown and Primary Download URLs
-    if (Array.isArray(data.assets)) {
-      data.assets.forEach(asset => {
-        const url = asset.browser_download_url;
-        const name = asset.name.toLowerCase();
-
-        if (name.includes('x86_64.flatpak')) {
-          const el = document.getElementById('downloadFlatpakX86');
-          if (el) el.href = url;
-          const primary = document.getElementById('primaryDownloadBtn');
-          if (primary) primary.href = url;
-        } else if (name.includes('aarch64.flatpak')) {
-          const el = document.getElementById('downloadFlatpakArm');
-          if (el) el.href = url;
-        } else if (name.endsWith('.appimage')) {
-          const el = document.getElementById('downloadAppImage');
-          if (el) el.href = url;
-        } else if (name.endsWith('.deb')) {
-          const el = document.getElementById('downloadDeb');
-          if (el) el.href = url;
-        } else if (name.endsWith('.rpm')) {
-          const el = document.getElementById('downloadRpm');
-          if (el) el.href = url;
-        }
-      });
     }
 
     // 3. Auto-populate Latest Release Card Title & Metadata
@@ -223,7 +263,9 @@ async function fetchLatestRelease() {
       }
     }
   } catch {
-    // Graceful silent fallback keeps pre-rendered HTML in place
+    renderReleaseDownloads(null);
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

@@ -395,7 +395,10 @@ body {
   top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%) translateY(4px);
-  min-width: 330px;
+  width: 390px;
+  box-sizing: border-box;
+  max-height: 65dvh;
+  overflow-y: auto;
   max-width: 92vw;
   background: var(--bg-surface-elevated);
   border: 1px solid var(--border-highlight);
@@ -1244,3 +1247,8 @@ button.dropdown-item {
     text-align: center;
   }
 }
+
+.download-status { text-align: center; color: var(--text-muted); padding: 0 16px; }
+.dropdown-item[aria-disabled="true"] { opacity: 0.6; cursor: default; }
+.dropdown-item-title { flex-wrap: wrap; }
+.dropdown-item:focus-visible { outline: 2px solid var(--accent-primary); }

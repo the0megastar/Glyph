@@ -24,7 +24,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=17">
+  <link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body>
   <!-- Sticky HeaderBar / Navbar -->
@@ -90,7 +90,7 @@
 
         <!-- Version Badge (Centered Below Icon) -->
         <div class="hero-badge-wrapper">
-          <span class="version-pill">v0.1.1 • Native GTK4 &amp; Libadwaita</span>
+          <span class="version-pill">Linux • Native GTK4 &amp; Libadwaita</span>
         </div>
 
         <h1 class="hero-title">
@@ -105,50 +105,59 @@
         <div class="hero-cta">
           <!-- Split Dropdown Button for Multi-Format Downloads -->
           <div class="split-btn-group" id="downloadSplitGroup">
-            <a href="https://github.com/the0megastar/Glyph/releases/latest/download/Glyph-0.1.2-x86_64.flatpak" class="btn btn-primary split-btn-main" id="primaryDownloadBtn" aria-label="Download for Linux">
+            <a href="https://github.com/the0megastar/Glyph/releases/latest" class="btn btn-primary split-btn-main" id="primaryDownloadBtn" aria-label="View Linux downloads">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
                 <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
                 <line x1="12" y1="22.08" x2="12" y2="12"></line>
               </svg>
-              <span>Download for Linux</span>
+              <span>View Linux downloads</span>
             </a>
-            <button class="btn btn-primary split-btn-toggle" id="downloadDropdownToggle" aria-haspopup="true" aria-expanded="false" aria-label="Open download formats menu">
+            <button class="btn btn-primary split-btn-toggle" id="downloadDropdownToggle" aria-controls="downloadDropdownMenu" aria-expanded="false" aria-label="Open download formats menu">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="dropdown-chevron" aria-hidden="true">
                 <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
             </button>
 
             <!-- Dropdown Menu -->
-            <div class="download-dropdown-panel" id="downloadDropdownMenu" role="menu" aria-label="Download options">
-              <div class="dropdown-header">Universal Packages (All Distros)</div>
+            <div class="download-dropdown-panel" id="downloadDropdownMenu" aria-label="Download options">
+              <div class="dropdown-header">Portable Packages</div>
 
-              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/Glyph-0.1.2-x86_64.flatpak" class="dropdown-item" role="menuitem" id="downloadFlatpakX86">
+              <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadFlatpakX86" data-description="Universal sandboxed install • 64-bit PC">
                 <div class="dropdown-item-icon">📦</div>
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">
                     Flatpak Bundle (x86_64)
                     <span class="chip chip-recommended">Recommended</span>
                   </div>
-                  <div class="dropdown-item-sub">Universal sandboxed install • 64-bit PC</div>
+                  <div class="dropdown-item-sub">View release assets on GitHub</div>
                 </div>
                 <span class="dropdown-item-ext">.flatpak</span>
               </a>
 
-              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/Glyph-0.1.2-aarch64.flatpak" class="dropdown-item" role="menuitem" id="downloadFlatpakArm">
+              <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadFlatpakArm" data-description="Universal sandboxed install • Raspberry Pi / ARM">
                 <div class="dropdown-item-icon">📦</div>
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">Flatpak Bundle (ARM64)</div>
-                  <div class="dropdown-item-sub">Universal sandboxed install • Raspberry Pi / ARM</div>
+                  <div class="dropdown-item-sub">View release assets on GitHub</div>
                 </div>
                 <span class="dropdown-item-ext">.flatpak</span>
               </a>
 
-              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/Glyph-0.1.2.AppImage" class="dropdown-item" role="menuitem" id="downloadAppImage">
+              <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadAppImageX86" data-description="Standalone portable executable, zero install">
                 <div class="dropdown-item-icon">🚀</div>
                 <div class="dropdown-item-info">
-                  <div class="dropdown-item-title">AppImage</div>
-                  <div class="dropdown-item-sub">Standalone portable executable, zero install</div>
+                  <div class="dropdown-item-title">AppImage — x86_64</div>
+                  <div class="dropdown-item-sub">View release assets on GitHub</div>
+                </div>
+                <span class="dropdown-item-ext">.AppImage</span>
+              </a>
+
+              <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadAppImageArm" data-description="Standalone portable executable, zero install">
+                <div class="dropdown-item-icon">🚀</div>
+                <div class="dropdown-item-info">
+                  <div class="dropdown-item-title">AppImage — ARM64</div>
+                  <div class="dropdown-item-sub">View release assets on GitHub</div>
                 </div>
                 <span class="dropdown-item-ext">.AppImage</span>
               </a>
@@ -156,40 +165,44 @@
               <div class="dropdown-divider"></div>
               <div class="dropdown-header">Native Distro Packages</div>
 
-              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/glyph-0.1.2.deb" class="dropdown-item" role="menuitem" id="downloadDeb">
+              <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadDeb" data-description="Architecture-independent • Compatible dependencies required">
                 <div class="dropdown-item-icon">📦</div>
                 <div class="dropdown-item-info">
-                  <div class="dropdown-item-title">Debian / Ubuntu / Mint / Pop!_OS</div>
-                  <div class="dropdown-item-sub">Native deb package • Universal (x86_64 &amp; ARM64)</div>
+                  <div class="dropdown-item-title">Debian / Ubuntu</div>
+                  <div class="dropdown-item-sub">View release assets on GitHub</div>
                 </div>
                 <span class="dropdown-item-ext">.deb</span>
               </a>
 
-              <a href="https://github.com/the0megastar/Glyph/releases/latest/download/glyph-0.1.2.rpm" class="dropdown-item" role="menuitem" id="downloadRpm">
+              <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadRpm" data-description="Architecture-independent • Compatible dependencies required">
                 <div class="dropdown-item-icon">📦</div>
                 <div class="dropdown-item-info">
-                  <div class="dropdown-item-title">Fedora / openSUSE / RHEL</div>
-                  <div class="dropdown-item-sub">Native rpm package • Universal (x86_64 &amp; ARM64)</div>
+                  <div class="dropdown-item-title">Fedora</div>
+                  <div class="dropdown-item-sub">View release assets on GitHub</div>
                 </div>
                 <span class="dropdown-item-ext">.rpm</span>
               </a>
 
-              <button type="button" class="dropdown-item dropdown-item-action" id="archAurDropdownItem" role="menuitem">
+              <a href="#archInstallCard" class="dropdown-item dropdown-item-action" id="archAurDropdownItem">
                 <div class="dropdown-item-icon">🏔️</div>
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">
-                    Arch Linux (AUR)
-                    <span class="chip chip-pending">Pending</span>
+                    Arch Linux — build from source
+
                   </div>
-                  <div class="dropdown-item-sub">Coming Soon • New Registrations Currently Closed</div>
+                  <div class="dropdown-item-sub">Local source installation</div>
                 </div>
-                <span class="dropdown-item-ext">AUR</span>
-              </button>
+                <span class="dropdown-item-ext">Source</span>
+              </a>
+              <a class="dropdown-item" href="https://github.com/the0megastar/Glyph/releases/latest">View all release assets</a>
             </div>
           </div>
         </div>
       </div>
     </section>
+
+    <p id="downloadStatus" class="download-status" aria-live="polite">Choose a package, or view release assets on GitHub.</p>
+    <noscript><p class="download-status"><a href="https://github.com/the0megastar/Glyph/releases/latest">View Linux downloads on GitHub</a></p></noscript>
 
     <!-- App Showcase / App Store Gallery -->
     <section class="showcase-section" id="showcase">
@@ -465,7 +478,7 @@
               <h3 class="install-card-title">Arch Linux &amp; User Prefix</h3>
             </div>
             <p class="install-card-desc">
-              While AUR maintainer registrations are temporarily closed, build directly into your user prefix:
+              From a source checkout with the required dependencies installed, build into your user prefix:
             </p>
             <div class="command-box">
               <span class="command-text" id="archCommandText">meson setup build --prefix="$HOME/.local" &amp;&amp; meson install -C build</span>
@@ -595,6 +608,6 @@
   </footer>
 
   <!-- App Script -->
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>
