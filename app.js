@@ -3,6 +3,7 @@
 if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
   initCopyButtons();
+  initPackageTabs();
   initDownloadDropdown();
   fetchLatestRelease();
 });
@@ -85,37 +86,48 @@ function initThemeToggle() {
   function getPreferredTheme() {
     const saved = localStorage.getItem('glyph-theme');
     if (saved) return saved;
-    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
 
-  function applyTheme(theme) {
+  function applyTheme(theme, persist = false) {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('glyph-theme', theme);
+    if (persist) {
+      localStorage.setItem('glyph-theme', theme);
+    }
 
     if (theme === 'light') {
       sunIcon.style.display = 'block';
       moonIcon.style.display = 'none';
       themeToggleBtn.setAttribute('title', 'Switch to dark theme');
+      themeToggleBtn.setAttribute('aria-label', 'Switch to dark theme');
     } else {
       sunIcon.style.display = 'none';
       moonIcon.style.display = 'block';
       themeToggleBtn.setAttribute('title', 'Switch to light theme');
+      themeToggleBtn.setAttribute('aria-label', 'Switch to light theme');
     }
   }
 
-  applyTheme(getPreferredTheme());
+  // Initial load: apply theme based on saved preference or system theme without saving
+  applyTheme(getPreferredTheme(), false);
 
   themeToggleBtn.addEventListener('click', () => {
-    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const current = document.documentElement.getAttribute('data-theme') || getPreferredTheme();
     const next = current === 'dark' ? 'light' : 'dark';
-    applyTheme(next);
+    applyTheme(next, true);
   });
 
-  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+  const darkMedia = window.matchMedia('(prefers-color-scheme: dark)');
+  const handleMediaChange = (e) => {
     if (!localStorage.getItem('glyph-theme')) {
-      applyTheme(e.matches ? 'light' : 'dark');
+      applyTheme(e.matches ? 'dark' : 'light', false);
     }
-  });
+  };
+  if (darkMedia.addEventListener) {
+    darkMedia.addEventListener('change', handleMediaChange);
+  } else if (darkMedia.addListener) {
+    darkMedia.addListener(handleMediaChange);
+  }
 }
 
 /* 2. Download Split Button & Dropdown Menu */
@@ -209,7 +221,9 @@ function initCopyButtons() {
   }
 
   attachCopy('copyBtn', 'commandText', 'copyBtnLabel');
-  attachCopy('archCopyBtn', 'archCommandText', 'archCopyBtnLabel');
+  for (const format of ['fedora', 'debian', 'arch', 'flatpak', 'appimage']) {
+    attachCopy(`copy-${format}`, `command-${format}`, `label-${format}`);
+  }
 }
 
 /* 5. Progressive Enhancement: Latest GitHub Release Check & Dynamic Release Notes */
@@ -355,3 +369,39 @@ function parseReleaseMarkdown(md) {
   return html;
 }
 
+
+function initPackageTabs() {
+  const list = document.querySelector('.package-tabs');
+  if (!list) return;
+  const tabs = [...list.querySelectorAll('[data-package]')];
+  list.setAttribute('role', 'tablist');
+  function select(tab) {
+    for (const item of tabs) {
+      const active = item === tab;
+      item.setAttribute('aria-selected', String(active));
+      item.tabIndex = active ? 0 : -1;
+      document.getElementById(`panel-${item.dataset.package}`).hidden = !active;
+    }
+  }
+  tabs.forEach((tab, index) => {
+    const panel = document.getElementById(`panel-${tab.dataset.package}`);
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-controls', panel.id);
+    panel.setAttribute('role', 'tabpanel');
+    panel.tabIndex = 0;
+    tab.addEventListener('click', () => select(tab));
+    tab.addEventListener('keydown', event => {
+      let next;
+      if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+      if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+      if (event.key === 'Home') next = 0;
+      if (event.key === 'End') next = tabs.length - 1;
+      if (next !== undefined) {
+        event.preventDefault();
+        select(tabs[next]);
+        tabs[next].focus();
+      }
+    });
+  });
+  select(tabs[0]);
+}

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -21,60 +21,43 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=18">
+  <link rel="stylesheet" href="styles.css?v=23">
+
+  <!-- Inline theme initializer to prevent flash of wrong theme -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('glyph-theme');
+        var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
-  <!-- Sticky HeaderBar / Navbar -->
+  <a class="skip-link" href="#hero">Skip to content</a>
   <header class="navbar">
-    <nav class="nav-inner" aria-label="Main Navigation">
-      <a href="#" class="nav-brand" aria-label="Glyph Home">
-        <img src="assets/glyph.svg" alt="Glyph icon" class="nav-logo" width="32" height="32">
-        <span class="nav-title">Glyph</span>
+    <nav class="nav-inner" aria-label="Main navigation">
+      <a href="#hero" class="nav-brand" aria-label="Glyph home">
+        <span class="nav-title">glyph<span class="brand-period">.</span></span>
+        <img src="assets/glyph.svg" alt="" class="nav-logo" width="38" height="38" aria-hidden="true">
       </a>
-
       <ul class="nav-links">
-        <li><a href="#showcase" class="nav-link">Showcase</a></li>
-        <li><a href="#features" class="nav-link">Features</a></li>
-        <li><a href="#security" class="nav-link">Security</a></li>
+        <li><a href="#showcase" class="nav-link">The app</a></li>
         <li><a href="#install" class="nav-link">Install</a></li>
         <li><a href="#releases" class="nav-link">Releases</a></li>
-        <li><a href="#support" class="nav-link">Support</a></li>
       </ul>
-
       <div class="nav-actions">
-        <button id="themeToggleBtn" class="theme-toggle-btn" aria-label="Toggle light and dark theme" title="Toggle theme">
-          <svg class="sun-icon" style="display:none;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        <button id="themeToggleBtn" class="theme-toggle-btn" aria-label="Switch color theme"><span class="sun-icon" aria-hidden="true">☼</span><span class="moon-icon" aria-hidden="true">◐</span></button>
+        <a href="https://ko-fi.com/the0megastar" target="_blank" rel="noopener noreferrer" class="nav-kofi-link" aria-label="Support on Ko-fi" title="Support on Ko-fi">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M11.351 2.715c-2.7 0-4.986.025-6.83.26C2.078 3.285 0 5.154 0 8.61c0 3.506.182 6.13 1.585 8.493 1.584 2.701 4.233 4.182 7.662 4.182h.83c4.209 0 6.494-2.234 7.637-4a9.5 9.5 0 0 0 1.091-2.338C21.792 14.688 24 12.22 24 9.208v-.415c0-3.247-2.13-5.507-5.792-5.87-1.558-.156-2.65-.208-6.857-.208m0 1.947c4.208 0 5.09.052 6.571.182 2.624.311 4.13 1.584 4.13 4v.39c0 2.156-1.792 3.844-3.87 3.844h-.935l-.156.649c-.208 1.013-.597 1.818-1.039 2.546-.909 1.428-2.545 3.064-5.922 3.064h-.805c-2.571 0-4.831-.883-6.078-3.195-1.09-2-1.298-4.155-1.298-7.506 0-2.181.857-3.402 3.012-3.714 1.533-.233 3.559-.26 6.39-.26m6.547 2.287c-.416 0-.65.234-.65.546v2.935c0 .311.234.545.65.545 1.324 0 2.051-.754 2.051-2s-.727-2.026-2.052-2.026m-10.39.182c-1.818 0-3.013 1.48-3.013 3.142 0 1.533.858 2.857 1.949 3.897.727.701 1.87 1.429 2.649 1.896a1.47 1.47 0 0 0 1.507 0c.78-.467 1.922-1.195 2.623-1.896 1.117-1.039 1.974-2.364 1.974-3.897 0-1.662-1.247-3.142-3.039-3.142-1.065 0-1.792.545-2.338 1.298-.493-.753-1.246-1.298-2.312-1.298"/>
           </svg>
-          <svg class="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-          </svg>
-        </button>
-
-        <a href="https://ko-fi.com/the0megastar" target="_blank" rel="noopener noreferrer" class="btn btn-kofi btn-sm" aria-label="Support on Ko-fi">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.683-2.566l.044-2.884s2.21.328 3.737-.899c1.611-1.297 2.122-4.301 2.848-4.301zm-4.733 2.775c-.69 1.15-2.029 1.066-2.029 1.066V6.994s1.776-.118 2.156 1.085c.38 1.203.563 2.019-.127 3.644z"></path>
-          </svg>
-          <span>Ko-fi</span>
         </a>
-
-        <a href="https://github.com/the0megastar/Glyph" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" aria-label="GitHub Repository">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
-          </svg>
-          <span>Star</span>
-        </a>
+        <a href="https://github.com/the0megastar/Glyph" class="nav-source">GitHub <span aria-hidden="true">↗</span></a>
       </div>
     </nav>
   </header>
@@ -83,25 +66,9 @@
     <!-- Hero Section - Perfectly Centered GNOME Flow -->
     <section class="hero-section" id="hero">
       <div class="container hero-container">
-        <!-- App Icon (100% Centered) -->
-        <div class="hero-icon-wrapper">
-          <img src="assets/glyph.svg" alt="Glyph App Icon" class="hero-icon" width="104" height="104">
-        </div>
-
-        <!-- Version Badge (Centered Below Icon) -->
-        <div class="hero-badge-wrapper">
-          <span class="version-pill">Linux • Native GTK4 &amp; Libadwaita</span>
-        </div>
-
-        <h1 class="hero-title">
-          Customize Application Icons <br>
-          <span class="hero-title-accent">on the Linux Desktop</span>
-        </h1>
-
-        <p class="hero-subtitle">
-          An intuitive, modern utility to browse installed applications, customize launcher icons and display names, and cleanly restore original system defaults at any time without touching root files.
-        </p>
-
+        <div class="hero-eyebrow"><span class="eyebrow-line"></span> A small tool for a personal desktop</div>
+        <h1 class="hero-title">Your apps.<br><span class="hero-title-accent">Your finishing touch.</span></h1>
+        <p class="hero-subtitle">Change the icons. Find the right names.<br>Make your Linux desktop feel a little more like you.</p>
         <div class="hero-cta">
           <!-- Split Dropdown Button for Multi-Format Downloads -->
           <div class="split-btn-group" id="downloadSplitGroup">
@@ -124,7 +91,7 @@
               <div class="dropdown-header">Portable Packages</div>
 
               <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadFlatpakX86" data-description="Universal sandboxed install • 64-bit PC">
-                <div class="dropdown-item-icon">📦</div>
+
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">
                     Flatpak Bundle (x86_64)
@@ -136,7 +103,7 @@
               </a>
 
               <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadFlatpakArm" data-description="Universal sandboxed install • Raspberry Pi / ARM">
-                <div class="dropdown-item-icon">📦</div>
+
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">Flatpak Bundle (ARM64)</div>
                   <div class="dropdown-item-sub">View release assets on GitHub</div>
@@ -145,7 +112,7 @@
               </a>
 
               <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadAppImageX86" data-description="Standalone portable executable, zero install">
-                <div class="dropdown-item-icon">🚀</div>
+
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">AppImage — x86_64</div>
                   <div class="dropdown-item-sub">View release assets on GitHub</div>
@@ -154,7 +121,7 @@
               </a>
 
               <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadAppImageArm" data-description="Standalone portable executable, zero install">
-                <div class="dropdown-item-icon">🚀</div>
+
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">AppImage — ARM64</div>
                   <div class="dropdown-item-sub">View release assets on GitHub</div>
@@ -166,7 +133,7 @@
               <div class="dropdown-header">Native Distro Packages</div>
 
               <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadDeb" data-description="Architecture-independent • Compatible dependencies required">
-                <div class="dropdown-item-icon">📦</div>
+
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">Debian / Ubuntu</div>
                   <div class="dropdown-item-sub">View release assets on GitHub</div>
@@ -175,7 +142,7 @@
               </a>
 
               <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadRpm" data-description="Architecture-independent • Compatible dependencies required">
-                <div class="dropdown-item-icon">📦</div>
+
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">Fedora</div>
                   <div class="dropdown-item-sub">View release assets on GitHub</div>
@@ -184,7 +151,7 @@
               </a>
 
               <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadArch" data-description="Architecture-independent • Compatible dependencies required">
-                <div class="dropdown-item-icon">🏔️</div>
+
                 <div class="dropdown-item-info">
                   <div class="dropdown-item-title">Arch Linux</div>
                   <div class="dropdown-item-sub">View release assets on GitHub</div>
@@ -201,183 +168,41 @@
     <p id="downloadStatus" class="download-status" aria-live="polite">Choose a package, or view release assets on GitHub.</p>
     <noscript><p class="download-status"><a href="https://github.com/the0megastar/Glyph/releases/latest">View Linux downloads on GitHub</a></p></noscript>
 
-    <!-- App Showcase / App Store Gallery -->
     <section class="showcase-section" id="showcase">
       <div class="container">
-        <div class="gallery-grid">
-          <!-- Screenshot 1: Library View -->
-          <div class="gallery-item">
-            <div class="window-frame">
-              <div class="window-header">
-                <div class="window-controls" aria-hidden="true">
-                  <span class="window-dot close"></span>
-                  <span class="window-dot min"></span>
-                  <span class="window-dot max"></span>
-                </div>
-                <div class="window-title">Installed Applications</div>
-              </div>
-              <div class="window-content">
-                <img src="assets/library.png" alt="Glyph Applications List View displaying installed system and Flatpak apps with filter and search" class="gallery-img" width="883" height="1024" loading="lazy">
-              </div>
-            </div>
-            <div class="gallery-caption">
-              <span class="gallery-caption-title">Applications List</span>
-              <span class="gallery-caption-desc">Browse, search, and filter installed desktop apps</span>
-            </div>
-          </div>
-
-          <!-- Screenshot 2: Detail View -->
-          <div class="gallery-item">
-            <div class="window-frame">
-              <div class="window-header">
-                <div class="window-controls" aria-hidden="true">
-                  <span class="window-dot close"></span>
-                  <span class="window-dot min"></span>
-                  <span class="window-dot max"></span>
-                </div>
-                <div class="window-title">Customize Launcher</div>
-              </div>
-              <div class="window-content">
-                <img src="assets/detail.png" alt="Glyph Customization View showing icon preview, rename tools, desktop file paths, and launch button" class="gallery-img" width="883" height="1024" loading="lazy">
-              </div>
-            </div>
-            <div class="gallery-caption">
-              <span class="gallery-caption-title">Customization &amp; Details</span>
-              <span class="gallery-caption-desc">Drag and drop icons, edit display names, and test launch</span>
-            </div>
-          </div>
+        <div class="product-strip"><span>Made for the Linux desktop</span><span class="version-pill">Native GTK4 &amp; Libadwaita</span><span>Free &amp; open source</span></div>
+        <div class="product-story">
+          <div class="story-copy"><span class="section-tag">01 / Find your app</span><h2>A familiar place.<br>A fresh perspective.</h2><p>Your installed applications, together in one place. Search by name, browse your library, or find the launchers you’ve already made your own.</p><a class="text-link" href="#install">Get Glyph <span aria-hidden="true">↗</span></a></div>
+          <figure class="screenshot-stage library-stage"><img src="assets/library.png" alt="Glyph application library with search and application filters" width="883" height="1024"><figcaption>The application library</figcaption></figure>
         </div>
       </div>
+      <div class="detail-band"><div class="container product-story reverse">
+        <figure class="screenshot-stage detail-stage"><img src="assets/detail.png" alt="Glyph application details with icon preview and launcher customization controls" width="883" height="1024" loading="lazy"><figcaption>A few details. A different feel.</figcaption></figure>
+        <div class="story-copy"><span class="section-tag">02 / Make it yours</span><h2>Small changes.<br>Very you.</h2><p>Drop in an icon you love. Give an app a name that makes sense to you. Preview the details and launch it right from Glyph.</p><div class="story-note"><span aria-hidden="true">↶</span><p>Changed your mind? Restore the original icon or name whenever you like.</p></div></div>
+      </div></div>
     </section>
 
-    <!-- Features Section -->
-    <section class="features-section" id="features">
-      <div class="container">
-        <div class="section-header">
-          <div class="section-tag">Powerful & Safe</div>
-          <h2 class="section-title">Designed for Complete Desktop Freedom</h2>
-          <p class="section-desc">Personalize your app launchers and icons cleanly without root permissions or modifying package-managed files.</p>
-        </div>
-
-        <div class="features-grid">
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-              </svg>
-            </div>
-            <h3 class="feature-title">Safe User-Level Overrides</h3>
-            <p class="feature-text">Never modifies system files in <code>/usr/share/applications</code>. Creates compliant FreeDesktop XDG overrides in <code>~/.local/share/applications</code> that preserve original packages.</p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="17 8 12 3 7 8"></polyline>
-                <line x1="12" y1="3" x2="12" y2="15"></line>
-              </svg>
-            </div>
-            <h3 class="feature-title">Drag & Drop Icon Replacement</h3>
-            <p class="feature-text">Simply drag and drop any image (SVG, PNG, WebP, JPG) directly onto the 96px icon preview, or browse your files to set your favorite custom artwork.</p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-              </svg>
-            </div>
-            <h3 class="feature-title">Custom Display Names</h3>
-            <p class="feature-text">Rename any application launcher right from the app page with automatic locale stripping and an instant one-click undo (↺) button.</p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="1 4 1 10 7 10"></polyline>
-                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-              </svg>
-            </div>
-            <h3 class="feature-title">Instant One-Click Restore</h3>
-            <p class="feature-text">Easily revert individual icons and names, or click "Restore All to System Default" to safely wipe overrides and restore upstream package defaults.</p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polygon points="10 8 16 12 10 16 10 8"></polygon>
-              </svg>
-            </div>
-            <h3 class="feature-title">Inspect & Test Launch</h3>
-            <p class="feature-text">Inspect the resolved Desktop file, App folder, and start Command with direct links to open locations in Files, plus a header Launch button to test immediately.</p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-icon-box">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                <line x1="12" y1="22.08" x2="12" y2="12"></line>
-              </svg>
-            </div>
-            <h3 class="feature-title">Universal Compatibility</h3>
-            <p class="feature-text">Works seamlessly across GNOME, KDE Plasma, COSMIC, Cinnamon, XFCE, and handles System packages, Flatpaks, Snaps, and local AppImages.</p>
-          </div>
-        </div>
+    <section class="features-section" id="features"><div class="container">
+      <div class="section-header"><span class="section-tag">The useful little things</span><h2 class="section-title">Just enough control.</h2></div>
+      <div class="features-grid">
+        <article class="feature-card"><span class="feature-index">01</span><h3 class="feature-title">Bring your own icons</h3><p class="feature-text">Use SVG, PNG, WebP, or JPG artwork. Drop an image onto the preview or choose one from your files.</p></article>
+        <article class="feature-card"><span class="feature-index">02</span><h3 class="feature-title">Give it a better name</h3><p class="feature-text">Edit the name you see in your launcher. Keep things short, familiar, or entirely your own.</p></article>
+        <article class="feature-card"><span class="feature-index">03</span><h3 class="feature-title">Keep a way back</h3><p class="feature-text">Restore a single customization or return everything to its system defaults.</p></article>
       </div>
-    </section>
-
-    <!-- How It Works Flow -->
-    <section class="how-section">
-      <div class="container">
-        <div class="section-header">
-          <div class="section-tag">How It Works</div>
-          <h2 class="section-title">Clean Customization in Three Steps</h2>
-          <p class="section-desc">No command line editing of .desktop files required.</p>
-        </div>
-
-        <div class="steps-grid">
-          <div class="step-card">
-            <div class="step-number">1</div>
-            <h3 class="step-title">Select an Application</h3>
-            <p class="step-desc">Open Glyph and search through all installed desktop applications, or filter to see only apps you have customized.</p>
-          </div>
-
-          <div class="step-card">
-            <div class="step-number">2</div>
-            <h3 class="step-title">Customize Icon & Name</h3>
-            <p class="step-desc">Drop your favorite SVG or PNG icon onto the preview and adjust the display name to match your personal setup.</p>
-          </div>
-
-          <div class="step-card">
-            <div class="step-number">3</div>
-            <h3 class="step-title">Enjoy & Restore Anytime</h3>
-            <p class="step-desc">Your desktop menu and dash update automatically. If you ever change your mind, restore stock defaults with a single click.</p>
-          </div>
-        </div>
-      </div>
-    </section>
+    </div></section>
 
     <!-- Security & Privacy Section -->
     <section class="security-section" id="security">
       <div class="container">
         <div class="section-header">
           <div class="section-tag">Privacy &amp; Security</div>
-          <h2 class="section-title">Engineered for Peace of Mind</h2>
-          <p class="section-desc">Full desktop freedom with zero compromises to your system integrity or personal privacy.</p>
+          <h2 class="section-title">Personalize with peace of mind.</h2>
+          <p class="section-desc">Your customizations stay in your user account. Original package files stay intact.</p>
         </div>
 
         <div class="security-grid">
           <div class="security-card">
-            <div class="security-icon-box">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                <path d="M9 12l2 2 4-4"></path>
-              </svg>
-            </div>
+
             <div class="security-card-content">
               <h3 class="security-card-title">100% Offline &amp; Private</h3>
               <p class="security-card-text">
@@ -387,12 +212,7 @@
           </div>
 
           <div class="security-card">
-            <div class="security-icon-box">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-            </div>
+
             <div class="security-card-content">
               <h3 class="security-card-title">Non-Destructive User Space</h3>
               <p class="security-card-text">
@@ -402,12 +222,7 @@
           </div>
 
           <div class="security-card">
-            <div class="security-icon-box">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-            </div>
+
             <div class="security-card-content">
               <h3 class="security-card-title">Read-Only Discovery</h3>
               <p class="security-card-text">
@@ -417,13 +232,7 @@
           </div>
 
           <div class="security-card">
-            <div class="security-icon-box">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                <polyline points="15 3 21 3 21 9"></polyline>
-                <line x1="10" y1="14" x2="21" y2="3"></line>
-              </svg>
-            </div>
+
             <div class="security-card-content">
               <h3 class="security-card-title">Desktop Portal Isolation</h3>
               <p class="security-card-text">
@@ -439,19 +248,55 @@
     <section class="install-section" id="install">
       <div class="container">
         <div class="section-header">
-          <div class="section-tag">Terminal &amp; Developers</div>
-          <h2 class="section-title">Source &amp; Arch Installation</h2>
+          <div class="section-tag">Make yourself at home</div>
+          <h2 class="section-title">A little more you. Start here.</h2>
           <p class="section-subtitle">
-            Prefer using the command line or building locally? Run directly in user space without root.
+            Choose your package format, then follow the steps below.
           </p>
         </div>
 
+        <div class="install-download"><a class="btn btn-primary" href="https://github.com/the0megastar/Glyph/releases/latest">Download a Linux package <span aria-hidden="true">↗</span></a><p>Flatpak, AppImage, and native packages. Availability varies by release.</p></div>
         <div class="install-grid">
+          <div class="install-card package-guide">
+            <h3 class="install-card-title">Install a downloaded package</h3>
+            <p class="install-card-desc">Open a terminal in the folder containing your download. Examples use v0.1.3; use the filename you downloaded.</p>
+            <div class="package-tabs" aria-label="Package format">
+              <button type="button" id="tab-fedora" data-package="fedora">Fedora<span>.rpm</span></button>
+              <button type="button" id="tab-debian" data-package="debian">Debian / Ubuntu<span>.deb</span></button>
+              <button type="button" id="tab-arch" data-package="arch">Arch Linux<span>.pkg.tar.zst</span></button>
+              <button type="button" id="tab-flatpak" data-package="flatpak">Flatpak<span>.flatpak</span></button>
+              <button type="button" id="tab-appimage" data-package="appimage">AppImage<span>.AppImage</span></button>
+            </div>
+            <section class="package-panel" id="panel-fedora" aria-labelledby="tab-fedora">
+              <h4>Fedora</h4><p class="install-card-desc">Install the downloaded RPM with DNF. It also installs required dependencies.</p>
+              <div class="command-box"><code class="command-text" id="command-fedora">sudo dnf install ./glyph-0.1.3.rpm</code><button type="button" class="copy-btn" id="copy-fedora" aria-label="Copy Fedora command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-fedora" aria-live="polite">Copy</span></button></div>
+            </section>
+            <section class="package-panel" id="panel-debian" aria-labelledby="tab-debian">
+              <h4>Debian / Ubuntu</h4><p class="install-card-desc">Install the downloaded DEB with APT. Your distribution must provide compatible dependencies.</p>
+              <div class="command-box"><code class="command-text" id="command-debian">sudo apt install ./glyph-0.1.3.deb</code><button type="button" class="copy-btn" id="copy-debian" aria-label="Copy Debian / Ubuntu command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-debian" aria-live="polite">Copy</span></button></div>
+            </section>
+            <section class="package-panel" id="panel-arch" aria-labelledby="tab-arch">
+              <h4>Arch Linux</h4><p class="install-card-desc">Install the downloaded Arch package with pacman. No build step is needed.</p>
+              <div class="command-box"><code class="command-text" id="command-arch">sudo pacman -U ./glyph-0.1.3-1-any.pkg.tar.zst</code><button type="button" class="copy-btn" id="copy-arch" aria-label="Copy Arch Linux command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-arch" aria-live="polite">Copy</span></button></div>
+            </section>
+            <section class="package-panel" id="panel-flatpak" aria-labelledby="tab-flatpak">
+              <h4>Flatpak</h4><p class="install-card-desc">With Flatpak installed, install the bundle for your user account. A runtime download may also be needed.</p>
+              <div class="command-box"><code class="command-text" id="command-flatpak">flatpak install --user ./Glyph-0.1.3-x86_64.flatpak</code><button type="button" class="copy-btn" id="copy-flatpak" aria-label="Copy Flatpak command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-flatpak" aria-live="polite">Copy</span></button></div>
+<p class="package-note">The example is for x86_64. For ARM64, download the aarch64 file and use that filename instead.</p>
+            </section>
+            <section class="package-panel" id="panel-appimage" aria-labelledby="tab-appimage">
+              <h4>AppImage</h4><p class="install-card-desc">Make the downloaded file executable, then run it.</p>
+              <div class="command-box"><code class="command-text" id="command-appimage">chmod +x ./Glyph-0.1.3-x86_64.AppImage
+./Glyph-0.1.3-x86_64.AppImage</code><button type="button" class="copy-btn" id="copy-appimage" aria-label="Copy AppImage command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-appimage" aria-live="polite">Copy</span></button></div>
+<p class="package-note">The example is for x86_64. For ARM64, download the aarch64 file and use that filename instead.</p>
+            </section>
+          </div>
+
           <!-- Option 1: Quick Run from Source -->
           <div class="install-card">
             <div class="install-card-header">
-              <span class="install-card-icon">⚡</span>
-              <h3 class="install-card-title">Run Instantly from Source</h3>
+
+              <h3 class="install-card-title">Run from source</h3>
             </div>
             <p class="install-card-desc">
               Zero compilation required. Clone and launch directly with Python 3, GTK4, and Libadwaita:
@@ -459,7 +304,7 @@
             <div class="command-box">
               <span class="command-text" id="commandText">git clone https://github.com/the0megastar/Glyph.git &amp;&amp; cd Glyph &amp;&amp; ./run.sh</span>
               <button class="copy-btn" id="copyBtn" aria-label="Copy run command to clipboard">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
@@ -468,26 +313,7 @@
             </div>
           </div>
 
-          <!-- Option 2: Arch Linux & Source Build -->
-          <div class="install-card" id="archInstallCard">
-            <div class="install-card-header">
-              <span class="install-card-icon">🏔️</span>
-              <h3 class="install-card-title">Arch Linux (Pacman &amp; AUR)</h3>
-            </div>
-            <p class="install-card-desc">
-              Install the pre-built package directly with pacman, or build with makepkg:
-            </p>
-            <div class="command-box">
-              <span class="command-text" id="archCommandText">sudo pacman -U glyph-*-any.pkg.tar.zst</span>
-              <button class="copy-btn" id="archCopyBtn" aria-label="Copy install command to clipboard">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-                <span id="archCopyBtnLabel">Copy</span>
-              </button>
-            </div>
-          </div>
+
         </div>
       </div>
     </section>
@@ -497,17 +323,17 @@
       <div class="container">
         <div class="section-header">
           <div class="section-tag">Latest Update</div>
-          <h2 class="section-title">Release Notes</h2>
+          <h2 class="section-title">What’s new.</h2>
         </div>
 
         <!-- Dynamic Latest Release Card (Auto-populated from GitHub API with static fallback) -->
-        <div class="release-card" id="latestReleaseCard" style="margin-bottom: 24px;">
+        <div class="release-card" id="latestReleaseCard">
           <div class="release-header">
             <div>
-              <h3 id="latestReleaseTitle" style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 700; color: var(--text-main);">Glyph v0.1.2</h3>
-              <span id="latestReleaseSubtitle" style="font-size: 0.86rem; color: var(--text-dim);">Latest Release • September 5, 2026</span>
+              <h3 id="latestReleaseTitle" class="release-title">Glyph v0.1.3</h3>
+              <span id="latestReleaseSubtitle" class="release-subtitle">Latest Release • September 8, 2026</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="release-actions">
               <span id="latestReleaseBadge" class="release-badge">Latest</span>
               <a id="latestReleaseGitHubLink" href="https://github.com/the0megastar/Glyph/releases/latest" target="_blank" rel="noopener noreferrer" class="release-github-tag" title="View release on GitHub">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
@@ -518,11 +344,11 @@
 
           <div id="latestReleaseBody">
             <ul class="release-notes-list">
-              <li><strong>Strict Flatpak Scoping</strong> - Replaced broad filesystem permissions with strictly scoped access to <code>/var/lib/flatpak/exports/share:ro</code> and <code>/var/lib/flatpak/app:ro</code> (and user equivalents). Completely locks out system runtimes, ostree objects, and repo metadata.</li>
-              <li><strong>Default Sandbox Isolation</strong> - Removed explicit host permissions for app state, relying exclusively on private sandboxed storage (<code>XDG_DATA_HOME</code>) for custom icons and backups.</li>
-              <li><strong>Full Host Boundary Protection</strong> - Completely eliminated <code>host:ro</code> and <code>host-os:ro</code> to satisfy Flathub security guidelines and isolate user personal files, documents, and credentials.</li>
-              <li><strong>Granular Launcher Overrides</strong> - Maintained scoped write access solely for user desktop overrides (<code>~/.local/share/applications</code>) and read-only user icon themes (<code>~/.local/share/icons</code>).</li>
-              <li><strong>Multi-Architecture Release Pipeline</strong> - Verified builds across 64-bit PC (<code>x86_64</code>) and ARM64 (<code>aarch64</code>) across Flatpak, AppImage, deb, rpm, and Arch Linux packages.</li>
+              <li><strong>Bulk Name Revert</strong> - Restore original display names across all customized applications in one click while preserving custom icons and user launchers.</li>
+              <li><strong>Write-Ahead Transaction Journaling &amp; Crash Recovery</strong> - Atomic <code>.journal.json</code> journaling automatically rolls back partial writes on unexpected interruptions, and corrupted configs fail closed safely.</li>
+              <li><strong>Portable Backups (Format Version 2)</strong> - Stores relative icon assets, full custom display names, and application metadata with preview dry-runs and directory traversal rejection.</li>
+              <li><strong>Desktop ID &amp; Path Hardening</strong> - Full support for nested desktop IDs with deterministic flattening, single-pass stock catalog caching, and safe legacy override cleanup.</li>
+              <li><strong>Flatpak Sandbox Correctness &amp; Host Path Routing</strong> - Direct override writing via <code>HOST_XDG_DATA_HOME</code>, FreeDesktop <code>.png</code>, <code>.svg</code>, and <code>.xpm</code> icon suffix normalization, and graceful host launcher bounds.</li>
             </ul>
           </div>
         </div>
@@ -530,13 +356,7 @@
         <!-- Release Archive Banner -->
         <div class="release-archive-card">
           <div class="release-archive-content">
-            <div class="release-archive-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="21 8 21 21 3 21 3 8"></polyline>
-                <rect x="1" y="3" width="22" height="5"></rect>
-                <line x1="10" y1="12" x2="14" y2="12"></line>
-              </svg>
-            </div>
+
             <div class="release-archive-text">
               <h3 class="release-archive-title">Looking for earlier releases?</h3>
               <p class="release-archive-desc">Browse complete release notes, source code assets, and historical packages in the GitHub archive.</p>
@@ -560,9 +380,9 @@
     <section class="support-section" id="support">
       <div class="container">
         <div class="support-banner">
-          <h2 class="support-title">Support Independent Open Source</h2>
+          <h2 class="support-title">Small app. Shared effort.</h2>
           <p class="support-desc">
-            Glyph is completely free, open source (GPL-3.0), and developed with passion for the Linux desktop community. If you enjoy customizing your system with Glyph, consider supporting ongoing development!
+            Glyph is free and open source. If it makes your desktop a happier place, you can help support its continued development.
           </p>
           <div class="support-buttons">
             <a href="https://ko-fi.com/the0megastar" target="_blank" rel="noopener noreferrer" class="btn btn-kofi">
@@ -605,6 +425,6 @@
   </footer>
 
   <!-- App Script -->
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>
