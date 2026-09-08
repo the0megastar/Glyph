@@ -183,16 +183,13 @@
                 <span class="dropdown-item-ext">.rpm</span>
               </a>
 
-              <a href="#archInstallCard" class="dropdown-item dropdown-item-action" id="archAurDropdownItem">
+              <a href="https://github.com/the0megastar/Glyph/releases/latest" class="dropdown-item" id="downloadArch" data-description="Architecture-independent • Compatible dependencies required">
                 <div class="dropdown-item-icon">🏔️</div>
                 <div class="dropdown-item-info">
-                  <div class="dropdown-item-title">
-                    Arch Linux — build from source
-
-                  </div>
-                  <div class="dropdown-item-sub">Local source installation</div>
+                  <div class="dropdown-item-title">Arch Linux</div>
+                  <div class="dropdown-item-sub">View release assets on GitHub</div>
                 </div>
-                <span class="dropdown-item-ext">Source</span>
+                <span class="dropdown-item-ext">.pkg.tar.zst</span>
               </a>
               <a class="dropdown-item" href="https://github.com/the0megastar/Glyph/releases/latest">View all release assets</a>
             </div>
@@ -471,18 +468,18 @@
             </div>
           </div>
 
-          <!-- Option 2: Arch Linux & Source Prefix Build -->
+          <!-- Option 2: Arch Linux & Source Build -->
           <div class="install-card" id="archInstallCard">
             <div class="install-card-header">
               <span class="install-card-icon">🏔️</span>
-              <h3 class="install-card-title">Arch Linux &amp; User Prefix</h3>
+              <h3 class="install-card-title">Arch Linux (Pacman &amp; AUR)</h3>
             </div>
             <p class="install-card-desc">
-              From a source checkout with the required dependencies installed, build into your user prefix:
+              Install the pre-built package directly with pacman, or build with makepkg:
             </p>
             <div class="command-box">
-              <span class="command-text" id="archCommandText">meson setup build --prefix="$HOME/.local" &amp;&amp; meson install -C build</span>
-              <button class="copy-btn" id="archCopyBtn" aria-label="Copy build command to clipboard">
+              <span class="command-text" id="archCommandText">sudo pacman -U glyph-*-any.pkg.tar.zst</span>
+              <button class="copy-btn" id="archCopyBtn" aria-label="Copy install command to clipboard">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -525,7 +522,7 @@
               <li><strong>Default Sandbox Isolation</strong> - Removed explicit host permissions for app state, relying exclusively on private sandboxed storage (<code>XDG_DATA_HOME</code>) for custom icons and backups.</li>
               <li><strong>Full Host Boundary Protection</strong> - Completely eliminated <code>host:ro</code> and <code>host-os:ro</code> to satisfy Flathub security guidelines and isolate user personal files, documents, and credentials.</li>
               <li><strong>Granular Launcher Overrides</strong> - Maintained scoped write access solely for user desktop overrides (<code>~/.local/share/applications</code>) and read-only user icon themes (<code>~/.local/share/icons</code>).</li>
-              <li><strong>Multi-Architecture Release Pipeline</strong> - Verified builds across 64-bit PC (<code>x86_64</code>) and ARM64 (<code>aarch64</code>) across Flatpak, AppImage, deb, and rpm packages.</li>
+              <li><strong>Multi-Architecture Release Pipeline</strong> - Verified builds across 64-bit PC (<code>x86_64</code>) and ARM64 (<code>aarch64</code>) across Flatpak, AppImage, deb, rpm, and Arch Linux packages.</li>
             </ul>
           </div>
         </div>
@@ -608,6 +605,6 @@
   </footer>
 
   <!-- App Script -->
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>

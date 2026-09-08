@@ -15,6 +15,7 @@ const DOWNLOADS = {
   downloadAppImageArm: v => `Glyph-${v}-aarch64.AppImage`,
   downloadDeb: v => `glyph-${v}.deb`,
   downloadRpm: v => `glyph-${v}.rpm`,
+  downloadArch: v => new RegExp(`^glyph-${v.replace(/\./g, '\\.')}-\\d+(?:\\.\\d+)?-any\\.pkg\\.tar\\.zst$`),
 };
 
 function resolveReleaseDownloads(release) {
@@ -23,14 +24,17 @@ function resolveReleaseDownloads(release) {
   }
   const version = release.tag_name.replace(/^v/, '');
   const assets = Array.isArray(release.assets) ? release.assets : [];
-  return Object.fromEntries(Object.entries(DOWNLOADS).map(([id, filename]) => {
-    const name = filename(version);
-    const matches = assets.filter(asset => asset?.name === name);
+  return Object.fromEntries(Object.entries(DOWNLOADS).map(([id, matcher]) => {
+    const pattern = matcher(version);
+    const matches = assets.filter(asset => {
+      if (!asset?.name) return false;
+      return typeof pattern === 'string' ? asset.name === pattern : pattern.test(asset.name);
+    });
     const asset = matches.length === 1 ? matches[0] : null;
     let href = null;
     try {
       const url = new URL(asset?.browser_download_url);
-      const expectedPath = `/the0megastar/Glyph/releases/download/${release.tag_name}/${name}`;
+      const expectedPath = `/the0megastar/Glyph/releases/download/${release.tag_name}/${asset.name}`;
       if (url.origin === 'https://github.com' && !url.username && !url.password &&
           decodeURIComponent(url.pathname) === expectedPath && !url.search && !url.hash) href = url.href;
     } catch { /* Missing or malformed assets remain unavailable. */ }

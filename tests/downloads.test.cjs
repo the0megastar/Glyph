@@ -2,11 +2,11 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { resolveReleaseDownloads: resolve, renderReleaseDownloads: render } = require('../app.js');
-const names = ['Glyph-0.1.3-x86_64.flatpak', 'Glyph-0.1.3-aarch64.flatpak', 'Glyph-0.1.3-x86_64.AppImage', 'Glyph-0.1.3-aarch64.AppImage', 'glyph-0.1.3.deb', 'glyph-0.1.3.rpm'];
+const names = ['Glyph-0.1.3-x86_64.flatpak', 'Glyph-0.1.3-aarch64.flatpak', 'Glyph-0.1.3-x86_64.AppImage', 'Glyph-0.1.3-aarch64.AppImage', 'glyph-0.1.3.deb', 'glyph-0.1.3.rpm', 'glyph-0.1.3-1-any.pkg.tar.zst'];
 const asset = name => ({ name, browser_download_url: `https://github.com/the0megastar/Glyph/releases/download/v0.1.3/${name}` });
 const release = assets => ({ tag_name: 'v0.1.3', assets });
 const complete = resolve(release(names.map(asset)));
-test('six exact mappings do not depend on asset order', () => {
+test('seven exact mappings do not depend on asset order', () => {
   assert.deepEqual(Object.values(complete), names.map(name => asset(name).browser_download_url));
   assert.deepEqual(resolve(release(names.map(asset).reverse())), complete);
 });
