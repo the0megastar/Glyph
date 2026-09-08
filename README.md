@@ -50,10 +50,14 @@ sudo apt install ./glyph-*.deb
 sudo dnf install ./glyph-*.rpm
 ```
 
-### 🏔️ Arch Linux (AUR)
+### 🏔️ Arch Linux
 
-A standard Arch Linux PKGBUILD is checked into [`packaging/aur/PKGBUILD`](packaging/aur/PKGBUILD). You can build and install directly with `makepkg`:
+Install the pre-built pacman package:
+```bash
+sudo pacman -U ./glyph-*-any.pkg.tar.zst
+```
 
+Or build and install directly using the checked-in PKGBUILD:
 ```bash
 cd packaging/aur
 makepkg -si
