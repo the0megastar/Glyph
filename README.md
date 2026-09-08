@@ -32,7 +32,9 @@ flatpak install Glyph-*-aarch64.flatpak
 ```
 
 ### 🚀 AppImage (`.AppImage`)
-Standalone portable executable. No installation required.
+Standalone executable with bundled Python, GTK, and Libadwaita. Requires glibc 2.39 or newer (Ubuntu 24.04 or a comparable newer distribution) and a working graphical session. No Python or GTK installation required.
+
+[AppImage build and verification instructions](packaging/appimage/README.md).
 
 ```bash
 chmod +x Glyph-*.AppImage && ./Glyph-*.AppImage

@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+HERE=$(CDPATH= cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd)
+export GI_TYPELIB_PATH="$HERE/usr/lib/girepository-1.0"
+export GIO_MODULE_DIR="$HERE/usr/lib/gio/modules"
+export GSETTINGS_SCHEMA_DIR="$HERE/usr/share/glib-2.0/schemas"
+export XDG_DATA_DIRS="$HERE/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+exec "$HERE/usr/bin/python3" -I -B "$HERE/usr/bin/glyph-bootstrap.py" "$@"

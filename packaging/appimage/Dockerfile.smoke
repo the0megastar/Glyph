@@ -1,0 +1,7 @@
+FROM ubuntu:24.04
+# Only desktop infrastructure: deliberately no Python, PyGObject, GTK or Adwaita.
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    xvfb xauth dbus-daemon fontconfig-config fonts-dejavu-core libgl1 libegl1 libgl1-mesa-dri \
+    && rm -rf /var/lib/apt/lists/*
+ENV HOME=/tmp/home GSETTINGS_BACKEND=memory GSK_RENDERER=cairo GTK_A11Y=none
+ENTRYPOINT ["/bin/sh", "-ec"]

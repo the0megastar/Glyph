@@ -96,7 +96,7 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
           - arch: aarch64
             runner: ubuntu-24.04-arm
     steps:
@@ -115,7 +115,15 @@ jobs:
             libadwaita-1-dev \
             python3-gi \
             python3-gi-cairo \
-            libgirepository1.0-dev
+            libgirepository1.0-dev \
+            gir1.2-girepository-2.0 \
+            libgdk-pixbuf2.0-bin \
+            librsvg2-common \
+            webp-pixbuf-loader \
+            dconf-gsettings-backend \
+            patchelf \
+            adwaita-icon-theme \
+            shared-mime-info
 
       - name: Stage AppDir and Build AppImage
         run: |
@@ -129,16 +137,20 @@ jobs:
           test -d "${APPDIR}/usr/lib/girepository-1.0"
           echo "AppDir integrity confirmed for ${{ matrix.arch }}"
 
+      - name: Test AppImage in a clean container
+        run: |
+          bash scripts/test_appimage.sh Glyph-*-${{ matrix.arch }}.AppImage
+
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
           name: appimage-${{ matrix.arch }}
           path: Glyph-*-${{ matrix.arch }}.AppImage
-          if-no-files-found: warn
+          if-no-files-found: error
 
       - name: Generate AppImage Step Summary
         if: always()
         run: |
           echo "### 🚀 AppImage (${{ matrix.arch }})" >> $GITHUB_STEP_SUMMARY
           echo "- **Architecture**: ${{ matrix.arch }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Format**: Portable Distro-Agnostic AppImage with PNG .DirIcon and pre-flight environment validation" >> $GITHUB_STEP_SUMMARY
+          echo "- **Format**: Bundled runtime with clean-container startup validation" >> $GITHUB_STEP_SUMMARY
