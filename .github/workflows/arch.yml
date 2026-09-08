@@ -22,6 +22,7 @@ jobs:
           pacman -Syu --noconfirm
           pacman -S --needed --noconfirm base-devel git meson ninja python python-gobject gtk4 libadwaita desktop-file-utils hicolor-icon-theme appstream
           useradd --create-home builder
+          git config --global --add safe.directory '*' || true
       - name: Validate release metadata
         shell: bash
         run: |

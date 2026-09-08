@@ -12,7 +12,24 @@ version=$(sed -n 's/^pkgver=//p' "$stage/PKGBUILD")
 revision=$(sed -n 's/^pkgrel=//p' "$stage/PKGBUILD")
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $revision =~ ^[0-9]+(\.[0-9]+)?$ ]]
 archive="glyph-${version}.tar.gz"
-git -C "$root" archive --format=tar --prefix="glyph-${version}/" HEAD | gzip -n > "$stage/$archive"
+git config --global --add safe.directory '*' 2>/dev/null || true
+
+if [ -d "$root/.git" ] && git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C "$root" archive --format=tar --prefix="glyph-${version}/" HEAD | gzip -n > "$stage/$archive"
+  source_desc="$(git -C "$root" rev-parse HEAD 2>/dev/null || echo 'git-HEAD')"
+else
+  tar --exclude='.git*' \
+      --exclude='_build*' \
+      --exclude='*.pyc' \
+      --exclude='__pycache__' \
+      --exclude='.flatpak*' \
+      --exclude='arch-output*' \
+      --exclude='.vscode' \
+      --exclude='docs' \
+      --transform "s,^\.,glyph-${version}," \
+      -czf "$stage/$archive" -C "$root" .
+  source_desc="workspace-archive"
+fi
 python3 - "$stage" "$archive" <<'PY'
 import hashlib
 from pathlib import Path
@@ -32,7 +49,7 @@ for pattern, replacement in [
 recipe.write_text(text)
 print(f'Staged source SHA256: {digest}')
 PY
-printf 'Building committed source: %s\n' "$(git -C "$root" rev-parse HEAD)"
+printf 'Building source: %s\n' "$source_desc"
 chown -R builder:builder "$stage"
 runuser -u builder -- bash -c 'cd "$1"; PKGEXT=.pkg.tar.zst makepkg --cleanbuild --check --noconfirm' bash "$stage"
 expected="glyph-${version}-${revision}-any.pkg.tar.zst"
