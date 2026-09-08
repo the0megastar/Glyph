@@ -210,7 +210,7 @@ flatpak run io.github.the0megastar.Glyph
 
 - **Testing Guide**: [`docs/TESTING.md`](docs/TESTING.md) — Running the 37 automated unit tests, individual test execution, and container packaging tests.
 - **Least-Privilege Permissions Audit**: [`docs/PERMISSIONS_AUDIT.md`](docs/PERMISSIONS_AUDIT.md) — Detailed review of Flatpak sandbox boundaries and filesystem grants.
-- **Release Notes**: [`docs/RELEASE_v0.1.3.md`](docs/RELEASE_v0.1.3.md) — Feature overview and download links.
+- **Release Notes**: [`releases/v0.1.3.md`](releases/v0.1.3.md) — Feature overview and download links.
 - **Post-Implementation Report**: [`docs/POST_IMPLEMENTATION_STATUS.md`](docs/POST_IMPLEMENTATION_STATUS.md) — Defect-by-defect status matrix against all review findings.
 
 ---

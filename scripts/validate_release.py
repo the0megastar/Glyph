@@ -144,6 +144,23 @@ def validate_metadata() -> bool:
     return all_ok
 
 
+def validate_release_notes() -> bool:
+    print("\n=== Release Notes Validation ===")
+    version = get_init_version()
+    possible_paths = [
+        ROOT / "releases" / f"v{version}.md",
+        ROOT / "releases" / f"{version}.md",
+    ]
+    for path in possible_paths:
+        if path.is_file() and path.stat().st_size > 0:
+            print(f"  [OK] Release notes found: {path.relative_to(ROOT)} ({path.stat().st_size} bytes)")
+            return True
+
+    print(f"  [FAIL] Missing release notes: releases/v{version}.md")
+    print(f"         Please create releases/v{version}.md before releasing.")
+    return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate Glyph release consistency")
     parser.add_argument("--tag", help="Optional git tag to match (e.g. v0.1.3)")
@@ -151,8 +168,9 @@ def main() -> int:
 
     v_ok = validate_versions(args.tag)
     m_ok = validate_metadata()
+    r_ok = validate_release_notes()
 
-    if v_ok and m_ok:
+    if v_ok and m_ok and r_ok:
         print("\nAll release validation checks PASSED.")
         return 0
     else:

@@ -204,14 +204,20 @@ jobs:
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF_NAME" ]; then
             VERSION=$(PYTHONPATH=src python3 -c "import glyph; print(glyph.__version__)")
           fi
-          if [ -f "docs/RELEASE_v${VERSION}.md" ]; then
-            echo "path=docs/RELEASE_v${VERSION}.md" >> "$GITHUB_OUTPUT"
-          elif [ -f "docs/RELEASE_${VERSION}.md" ]; then
-            echo "path=docs/RELEASE_${VERSION}.md" >> "$GITHUB_OUTPUT"
-          elif [ -f "docs/RELEASE_v0.1.3.md" ]; then
-            echo "path=docs/RELEASE_v0.1.3.md" >> "$GITHUB_OUTPUT"
+          if [ -f "releases/v${VERSION}.md" ]; then
+            echo "path=releases/v${VERSION}.md" >> "$GITHUB_OUTPUT"
+          elif [ -f "releases/${VERSION}.md" ]; then
+            echo "path=releases/${VERSION}.md" >> "$GITHUB_OUTPUT"
           else
-            echo "path=" >> "$GITHUB_OUTPUT"
+            FALLBACK="/tmp/glyph_release_fallback.md"
+            cat <<EOF > "$FALLBACK"
+          # Glyph v${VERSION}
+
+          Pre-built universal packages for **64-bit PC (x86_64)** and **ARM64 (aarch64)** are attached below.
+
+          For complete documentation, source code, and bug reports, visit the [Glyph repository](https://github.com/the0megastar/Glyph).
+          EOF
+            echo "path=${FALLBACK}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload Release Binaries to GitHub Release
@@ -221,4 +227,4 @@ jobs:
           body_path: ${{ steps.release_notes.outputs.path }}
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
