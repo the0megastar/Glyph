@@ -507,7 +507,7 @@ class GlyphWindow(Adw.ApplicationWindow):
                     self._toast(str(exc))
                     return
                 self.reload()
-                self._toast("Display name saved. Log out to refresh the app grid.")
+                self._toast("Display name saved.")
 
         dialog.connect("response", on_response)
         dialog.present(self)
@@ -534,7 +534,7 @@ class GlyphWindow(Adw.ApplicationWindow):
             self._toast(str(exc))
             return False
         self.reload()
-        self._toast("Icon saved. Log out to refresh the app grid.")
+        self._toast("Icon saved.")
         return True
 
     def _on_icon_dropped(self, _target: Gtk.DropTarget, value: object, _x: float, _y: float) -> bool:
@@ -585,7 +585,7 @@ class GlyphWindow(Adw.ApplicationWindow):
             self._toast(str(exc))
             return
         self.reload()
-        self._toast("Original icon restored. Log out to refresh the app grid.")
+        self._toast("Original icon restored.")
 
     def _on_restore_stock(self, _button: Gtk.Button) -> None:
         if not self._detail_id:

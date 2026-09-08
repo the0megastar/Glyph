@@ -30,11 +30,9 @@ def show_refresh_help(parent: Gtk.Widget | None) -> None:
     dialog = Adw.AlertDialog(
         heading="Refreshing icons",
         body=(
-            "Glyph saves the new launcher icon immediately. GNOME Shell often "
-            "keeps the old image in the app grid until you log out and log back in.\n\n"
-            "Opening the app can show the new icon on the dash for that window. "
-            "Unpinning, pinning, or running desktop-menu update commands does not "
-            "clear the grid cache. Glyph cannot force a refresh."
+            "Glyph updates launcher icons and display names immediately on the dock and in application search.\n\n"
+            "If your desktop's full application grid does not show the change right away (notably on some GNOME Shell versions), "
+            "logging out and back in will force the shell to reload its cached textures."
         ),
     )
     dialog.add_response("ok", "OK")
@@ -72,7 +70,7 @@ def confirm_revert_all_icons(parent: Gtk.Widget | None) -> None:
                 _toast(parent, str(exc))
                 return
             _reload(parent)
-            msg = f"Restored original icons for {res.completed} application{'s' if res.completed != 1 else ''}. Log out to refresh grid."
+            msg = f"Restored original icons for {res.completed} application{'s' if res.completed != 1 else ''}."
             if res.errors:
                 msg += f" ({len(res.errors)} failed)"
             _toast(parent, msg)
@@ -112,7 +110,7 @@ def confirm_revert_all_names(parent: Gtk.Widget | None) -> None:
                 _toast(parent, str(exc))
                 return
             _reload(parent)
-            msg = f"Restored original names for {res.completed} application{'s' if res.completed != 1 else ''}. Log out to refresh grid."
+            msg = f"Restored original names for {res.completed} application{'s' if res.completed != 1 else ''}."
             if res.errors:
                 msg += f" ({len(res.errors)} failed)"
             _toast(parent, msg)
@@ -211,7 +209,6 @@ def handle_import_open_done(parent: Gtk.Widget | None, dlg: Gtk.FileDialog, resu
                 msg += f" ({len(res.skipped)} skipped)"
             if res.errors:
                 msg += f" ({len(res.errors)} failed)"
-            msg += " Log out to refresh grid."
             _toast(parent, msg)
         except Exception as exc:
             _toast(parent, f"Import failed: {exc}")

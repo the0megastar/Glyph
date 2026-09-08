@@ -121,8 +121,8 @@ exporting. Old Flatpak transaction journals are never replayed against host laun
 
 ## Icon Cache & Desktop Refresh
 
-- **KDE Plasma, XFCE, COSMIC, Cinnamon**: Automatically refresh application menus immediately via inotify.
-- **GNOME Shell**: GNOME Shell caches the app grid aggressively. Launching the customized app updates the dash/dock icon immediately, but the full-screen App Grid may take a session logout and login to reload its image cache.
+- **Desktop Refresh**: Changes to icons and display names update immediately on the dock/dash, in application search, and across application menus via kernel `inotify` (tested on GNOME, KDE Plasma, XFCE, COSMIC, and Cinnamon).
+- **GNOME Shell App Grid**: Docks and searches update instantly. On certain GNOME Shell versions, the full-screen App Grid may occasionally lag behind due to internal texture caching; logging out and back in will force it to reload.
 - Launcher icons are what this app changes. The icon inside a running window’s titlebar is provided by the application process itself and is out of scope.
 
 ---
