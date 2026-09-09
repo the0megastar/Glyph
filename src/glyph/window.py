@@ -48,6 +48,7 @@ def _primary_menu_model() -> Gio.Menu:
     menu.append_section(None, reset_section)
 
     help_section = Gio.Menu()
+    help_section.append("Explore v0.2.0 UI…", "win.preview")
     help_section.append("How to Refresh Icons…", "app.refresh-help")
     menu.append_section(None, help_section)
 
@@ -82,6 +83,10 @@ class GlyphWindow(Adw.ApplicationWindow):
         self._rows: dict[str, Adw.ActionRow] = {}
         self._detail_id: str | None = None
 
+        preview_action = Gio.SimpleAction.new("preview", None)
+        preview_action.connect("activate", self._on_preview)
+        self.add_action(preview_action)
+
         self._filter_action = Gio.SimpleAction.new_stateful(
             "filter",
             GLib.VariantType.new("s"),
@@ -109,6 +114,11 @@ class GlyphWindow(Adw.ApplicationWindow):
     def _on_popped(self, _nav: Adw.NavigationView, page: Adw.NavigationPage) -> None:
         if page == getattr(self, "_detail_page", None):
             self._detail_id = None
+
+    def _on_preview(self, *_args) -> None:
+        from glyph.preview import present_preview
+
+        present_preview(self)
 
     def _build_list_page(self) -> Adw.NavigationPage:
         toolbar = Adw.ToolbarView()
