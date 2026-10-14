@@ -72,3 +72,11 @@ def set_icon_value(text: str, value: str) -> str:
 def set_name_value(text: str, value: str) -> str:
     return _replace_lines(text, 'Name', [f'Name={_escape(value)}\n'])
 
+
+def get_exec_value(text: str) -> str:
+    return _value(text, 'Exec')
+
+
+def set_exec_value(text: str, value: str) -> str:
+    return _replace_lines(text, 'Exec', [f'Exec={_escape(value)}\n'])
+

@@ -12,7 +12,11 @@ python.install_sources(
     'glyph/paths.py',
     'glyph/desktop_text.py',
     'glyph/backups.py',
-    'glyph/preview.py',
+    'glyph/sources.py',
+    'glyph/icon_themes.py',
+    'glyph/launcher.py',
+    'glyph/appimage.py',
+    'glyph/guidance.py',
   ],
   preserve_path: true,
 )

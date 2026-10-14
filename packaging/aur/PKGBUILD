@@ -1,6 +1,6 @@
 # Maintainer: the0megastar <the0megastar@users.noreply.github.com>
 pkgname=glyph
-pkgver=0.1.3
+pkgver=0.1.5
 pkgrel=1
 pkgdesc="Customize application launcher icons and names on Linux"
 arch=('any')

@@ -12,6 +12,9 @@ import glyph.paths as paths
 from glyph.paths import find_stock, stock_dirs
 
 
+import glyph.sources as sources
+
+
 @dataclass
 class AppEntry:
     desktop_id: str
@@ -28,6 +31,18 @@ class AppEntry:
     custom_icon: bool = False
     custom_name: bool = False
     original_name: str = ""
+    package_kind: str = "unknown"
+    install_scope: str = "unknown"
+    management: str = "external_launcher"
+    version: str = ""
+    version_provenance: str = ""
+    source_evidence: str = ""
+    custom_command: bool = False
+    original_command: str = ""
+    is_appimage: bool = False
+    appimage_path: str = ""
+    is_theme_icon: bool = False
+    flatpak_id: str = ""
 
 
 @dataclass
@@ -149,7 +164,7 @@ def _resolve_app_folder(entry: _DesktopEntry) -> str:
     candidate_id = entry.flatpak_id or entry.desktop_id.removesuffix(".desktop")
     if candidate_id:
         deployments = (
-            paths.host_data_home() / "flatpak/app" / candidate_id / "current/active",
+            paths.data_home() / "flatpak/app" / candidate_id / "current/active",
             Path("/var/lib/flatpak/app") / candidate_id / "current/active",
         )
         for deployment in deployments:
@@ -187,10 +202,20 @@ def _gicon(value: str) -> Gio.Icon | None:
     return Gio.ThemedIcon.new(value)
 
 
-def list_apps(overrides: dict[str, dict]) -> list[AppEntry]:
+def list_apps(
+    overrides: dict[str, dict],
+    *,
+    resolve_source_metadata: bool = True,
+) -> list[AppEntry]:
     apps: list[AppEntry] = []
     active_index, stock_index, local_index = paths.application_indexes()
     local_files = set(local_index.values())
+
+    system_files = set(str(p) for p in stock_index.values()) | {
+        str(p) for p in active_index.values() if p not in local_files
+    }
+    if resolve_source_metadata:
+        sources.prime_system_package_cache(list(system_files))
 
     for desktop_id, filename_path in active_index.items():
         entry = _load_desktop_entry(desktop_id, filename_path)
@@ -199,22 +224,34 @@ def list_apps(overrides: dict[str, dict]) -> list[AppEntry]:
 
         filename = str(filename_path)
         override = overrides.get(desktop_id) or {}
-        custom_icon = bool(override.get("icon_path"))
-        custom_name = bool(override.get("custom_name"))
         stock_filename = find_stock_desktop_file(desktop_id, index=stock_index)
-        is_local_file = filename_path in local_files
 
-        if is_local_file and stock_filename:
-            source = classify_source(stock_filename)
-        elif is_local_file:
-            source = "Local"
-        else:
-            source = classify_source(filename)
+        source_info = sources.classify_source_info(
+            desktop_id=desktop_id,
+            filename=filename,
+            command=entry.command,
+            stock_filename=stock_filename,
+            flatpak_id=entry.flatpak_id,
+            override=override,
+            resolve_external_metadata=resolve_source_metadata,
+        )
 
-        gicon = _gicon(entry.icon)
+        custom_name = bool(override.get("custom_name"))
+        custom_command = bool(override.get("custom_command"))
+        command = override.get("custom_command") or entry.command
+
+        theme_icon = override.get("theme_icon")
         icon_path = override.get("icon_path")
-        if icon_path and Path(icon_path).is_file():
+        gicon = _gicon(entry.icon)
+        custom_icon = False
+        if theme_icon:
+            gicon = Gio.ThemedIcon.new(theme_icon)
+            custom_icon = True
+        elif icon_path and Path(icon_path).is_file():
             gicon = Gio.FileIcon.new(Gio.File.new_for_path(icon_path))
+            custom_icon = True
+
+        appimage_target = override.get("appimage_managed") or sources.is_appimage_target(command)
 
         apps.append(
             AppEntry(
@@ -222,18 +259,57 @@ def list_apps(overrides: dict[str, dict]) -> list[AppEntry]:
                 name=override.get("custom_name") or entry.name or desktop_id,
                 filename=filename,
                 app_folder=_resolve_app_folder(entry),
-                command=entry.command,
+                command=command,
                 icon_value=entry.icon,
                 gicon=gicon,
-                source=source,
-                custom=custom_icon or custom_name,
+                source=source_info.display_name,
+                custom=custom_icon or custom_name or custom_command,
                 has_stock=bool(stock_filename),
                 stock_filename=stock_filename,
                 custom_icon=custom_icon,
                 custom_name=custom_name,
                 original_name=override.get("original_name", ""),
+                package_kind=source_info.package_kind,
+                install_scope=source_info.install_scope,
+                management=source_info.management,
+                version=source_info.version,
+                version_provenance=source_info.version_provenance,
+                source_evidence=source_info.source_evidence,
+                custom_command=custom_command,
+                original_command=override.get("original_command", ""),
+                is_appimage=(source_info.package_kind == "appimage"),
+                appimage_path=appimage_target,
+                is_theme_icon=bool(theme_icon),
+                flatpak_id=entry.flatpak_id,
             )
         )
 
     apps.sort(key=lambda app: app.name.casefold())
     return apps
+
+
+def resolve_app_sources(apps: list[AppEntry]) -> dict[str, sources.SourceInfo]:
+    """Resolve package manager metadata for an already displayed catalog."""
+    active_index, stock_index, local_index = paths.application_indexes()
+    local_files = set(local_index.values())
+    system_files = set(str(p) for p in stock_index.values()) | {
+        str(p) for p in active_index.values() if p not in local_files
+    }
+    sources.prime_system_package_cache(list(system_files))
+
+    result: dict[str, sources.SourceInfo] = {}
+    for app in apps:
+        managed_appimage = app.management == "glyph_registered"
+        override = {
+            "glyph_managed_appimage": managed_appimage,
+            "appimage_managed": app.appimage_path if managed_appimage else "",
+        }
+        result[app.desktop_id] = sources.classify_source_info(
+            desktop_id=app.desktop_id,
+            filename=app.filename,
+            command=app.command,
+            stock_filename=app.stock_filename,
+            flatpak_id=app.flatpak_id,
+            override=override,
+        )
+    return result

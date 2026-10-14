@@ -1,5 +1,8 @@
+import logging
+import os
 from pathlib import Path
 import subprocess
+import threading
 
 import gi
 
@@ -7,14 +10,22 @@ gi.require_version("GioUnix", "2.0")
 
 from gi.repository import Adw, Gdk, Gio, GioUnix, GLib, GObject, Gtk, Pango
 
-from glyph.catalog import AppEntry, list_apps
+import glyph.appimage as appimage
+from glyph.catalog import AppEntry, list_apps, resolve_app_sources
+from glyph import dialogs
+import glyph.guidance as guidance
+import glyph.launcher as launcher
 from glyph.paths import in_flatpak
+import glyph.sources as sources
 from glyph.overrides import (
     OverrideError,
+    apply_command,
     apply_icon,
     apply_name,
+    apply_theme_icon,
     load_state,
     restore_stock_launcher,
+    revert_command,
     revert_icon,
     revert_name,
 )
@@ -34,6 +45,10 @@ def _primary_menu_model() -> Gio.Menu:
     menu = Gio.Menu()
 
     overrides_section = Gio.Menu()
+    overrides_section.append("Add AppImage…", "win.add-appimage")
+    overrides_section.append("Find AppImages to Register…", "win.find-appimages")
+    if os.environ.get("APPIMAGE"):
+        overrides_section.append("Integrate Glyph into Desktop Grid…", "win.integrate-glyph")
     overrides_section.append("Export Overrides…", "app.export-overrides")
     overrides_section.append("Restore Overrides…", "app.import-overrides")
     overrides_section.append("Open Data Folder in Files", "app.open-data-folder")
@@ -48,7 +63,6 @@ def _primary_menu_model() -> Gio.Menu:
     menu.append_section(None, reset_section)
 
     help_section = Gio.Menu()
-    help_section.append("Explore v0.2.0 UI…", "win.preview")
     help_section.append("How to Refresh Icons…", "app.refresh-help")
     menu.append_section(None, help_section)
 
@@ -82,10 +96,20 @@ class GlyphWindow(Adw.ApplicationWindow):
         self._filter_custom = False
         self._rows: dict[str, Adw.ActionRow] = {}
         self._detail_id: str | None = None
+        self._source_refresh_generation = 0
+        self._source_refresh_running = False
 
-        preview_action = Gio.SimpleAction.new("preview", None)
-        preview_action.connect("activate", self._on_preview)
-        self.add_action(preview_action)
+        add_appimage_action = Gio.SimpleAction.new("add-appimage", None)
+        add_appimage_action.connect("activate", self._on_add_appimage)
+        self.add_action(add_appimage_action)
+
+        find_appimages_action = Gio.SimpleAction.new("find-appimages", None)
+        find_appimages_action.connect("activate", self._on_find_appimages)
+        self.add_action(find_appimages_action)
+
+        integrate_action = Gio.SimpleAction.new("integrate-glyph", None)
+        integrate_action.connect("activate", self._on_integrate_glyph)
+        self.add_action(integrate_action)
 
         self._filter_action = Gio.SimpleAction.new_stateful(
             "filter",
@@ -115,10 +139,110 @@ class GlyphWindow(Adw.ApplicationWindow):
         if page == getattr(self, "_detail_page", None):
             self._detail_id = None
 
-    def _on_preview(self, *_args) -> None:
-        from glyph.preview import present_preview
+    def _on_find_appimages(self, *_args) -> None:
+        try:
+            state = load_state()
+        except OverrideError as exc:
+            self._toast(str(exc))
+            return
 
-        present_preview(self)
+        existing_targets: set[str] = set()
+        for app in self._apps:
+            if app.appimage_path:
+                existing_targets.add(app.appimage_path)
+                try:
+                    existing_targets.add(str(Path(app.appimage_path).resolve()))
+                except (OSError, RuntimeError):
+                    pass
+            if app.command:
+                target = sources.is_appimage_target(app.command)
+                if target:
+                    existing_targets.add(target)
+                    try:
+                        existing_targets.add(str(Path(target).resolve()))
+                    except (OSError, RuntimeError):
+                        pass
+        for record in state.values():
+            for key in ("appimage_managed", "appimage_source"):
+                path = record.get(key)
+                if path:
+                    existing_targets.add(path)
+                    try:
+                        existing_targets.add(str(Path(path).resolve()))
+                    except (OSError, RuntimeError):
+                        pass
+
+        candidates = appimage.discover_registration_candidates(existing_targets)
+        self.nav.push(self._build_appimage_candidates_page(candidates))
+
+    def _build_appimage_candidates_page(
+        self,
+        candidates: list[appimage.AppImageCandidate],
+    ) -> Adw.NavigationPage:
+        toolbar = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+        toolbar.add_top_bar(header)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content.set_margin_top(16)
+        content.set_margin_bottom(20)
+        content.set_margin_start(16)
+        content.set_margin_end(16)
+
+        if candidates:
+            intro = Gtk.Label(
+                label="AppImages in ~/Applications that do not appear in your app list.",
+                xalign=0,
+                wrap=True,
+            )
+            intro.add_css_class("dim-label")
+            content.append(intro)
+
+            listbox = Gtk.ListBox()
+            listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+            listbox.add_css_class("boxed-list")
+            for candidate in candidates:
+                listbox.append(self._make_candidate_row(candidate))
+            content.append(listbox)
+        else:
+            empty = Adw.StatusPage()
+            empty.set_icon_name("application-x-executable-symbolic")
+            empty.set_title("No AppImages to Register")
+            empty.set_description("No unregistered AppImages were found in ~/Applications.")
+            content.append(empty)
+
+        add_button = Gtk.Button(label="Add AppImage…", css_classes=["suggested-action"])
+        add_button.set_halign(Gtk.Align.CENTER)
+        add_button.connect("clicked", lambda *_: self._on_add_appimage())
+        content.append(add_button)
+
+        clamp = Adw.Clamp(maximum_size=640)
+        clamp.set_child(content)
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_child(clamp)
+        toolbar.set_content(scrolled)
+
+        return Adw.NavigationPage(title="AppImages to Register", child=toolbar)
+
+    def _make_candidate_row(self, candidate: appimage.AppImageCandidate) -> Adw.ActionRow:
+        row = Adw.ActionRow()
+        row.set_title(candidate.display_name)
+        row.set_subtitle(f"{candidate.path.name} · ~/Applications")
+        row.add_prefix(_image_from_gicon(None, 32))
+        button = Gtk.Button(label="Register…", valign=Gtk.Align.CENTER, css_classes=["suggested-action"])
+        button.connect("clicked", lambda _button: self._on_register_candidate(candidate))
+        row.add_suffix(button)
+        row.set_activatable(False)
+        return row
+
+    def _on_register_candidate(self, candidate: appimage.AppImageCandidate) -> None:
+        try:
+            plan = appimage.plan_appimage_registration(candidate.path)
+        except (appimage.AppImageError, ValueError) as exc:
+            self._toast(f"Cannot register AppImage: {exc}")
+            return
+        self._show_appimage_registration_preview(plan, open_detail=False)
 
     def _build_list_page(self) -> Adw.NavigationPage:
         toolbar = Adw.ToolbarView()
@@ -171,14 +295,75 @@ class GlyphWindow(Adw.ApplicationWindow):
             if hasattr(self, "_toast"):
                 self._toast(str(exc))
             return
-        self._apps = list_apps(state)
+        self._apps = list_apps(state, resolve_source_metadata=False)
         self._update_filter_menu()
         self._rebuild_list()
-        if self._detail_id and getattr(self, "_detail_page", None) is not None:
+        self._request_source_metadata_refresh()
+        if getattr(self, "_detail_id", None) and getattr(self, "_detail_page", None) is not None:
             app = self._find(self._detail_id)
             if app is not None:
                 self._detail_page.set_title(app.name)
                 self._fill_detail(app)
+
+    def _request_source_metadata_refresh(self) -> None:
+        self._source_refresh_generation += 1
+        if self._source_refresh_running:
+            return
+        self._start_source_metadata_refresh(self._source_refresh_generation)
+
+    def _start_source_metadata_refresh(self, generation: int) -> None:
+        self._source_refresh_running = True
+        apps = list(self._apps)
+
+        def refresh() -> None:
+            try:
+                metadata = resolve_app_sources(apps)
+            except Exception:
+                logging.exception("Could not resolve application package metadata")
+                metadata = None
+            GLib.idle_add(self._apply_source_metadata, generation, metadata)
+
+        threading.Thread(target=refresh, name="glyph-source-metadata", daemon=True).start()
+
+    def _apply_source_metadata(self, generation: int, metadata: dict | None) -> bool:
+        self._source_refresh_running = False
+        if generation != self._source_refresh_generation:
+            self._start_source_metadata_refresh(self._source_refresh_generation)
+            return GLib.SOURCE_REMOVE
+        if metadata is None:
+            return GLib.SOURCE_REMOVE
+
+        for app in self._apps:
+            info = metadata.get(app.desktop_id)
+            if info is None:
+                continue
+            app.source = info.display_name
+            app.package_kind = info.package_kind
+            app.install_scope = info.install_scope
+            app.management = info.management
+            app.version = info.version
+            app.version_provenance = info.version_provenance
+            app.source_evidence = info.source_evidence
+            app.is_appimage = info.package_kind == "appimage"
+
+            row = self._rows.get(app.desktop_id)
+            if row is not None:
+                subtitle = app.source
+                is_shadowed = (
+                    app.has_stock
+                    and bool(app.stock_filename)
+                    and bool(app.filename)
+                    and Path(app.filename).resolve() != Path(app.stock_filename).resolve()
+                )
+                if is_shadowed and not app.custom:
+                    subtitle += " · Override"
+                row.set_subtitle(subtitle)
+
+        if self._detail_id:
+            app = self._find(self._detail_id)
+            if app is not None and getattr(self, "_detail_page", None) is not None:
+                self._fill_detail(app)
+        return GLib.SOURCE_REMOVE
 
     def _update_filter_menu(self) -> None:
         total = len(self._apps)
@@ -213,6 +398,7 @@ class GlyphWindow(Adw.ApplicationWindow):
 
         query = self._query
         custom_only = self._filter_custom
+
         visible = 0
         for app in self._apps:
             if custom_only and not app.custom:
@@ -260,6 +446,11 @@ class GlyphWindow(Adw.ApplicationWindow):
         row.desktop_id = app.desktop_id
         return row
 
+    def _open_detail(self, app: AppEntry) -> None:
+        self._detail_id = app.desktop_id
+        page = self._build_detail_page(app)
+        self.nav.push(page)
+
     def _on_row_activated(self, _listbox: Gtk.ListBox, row: Gtk.ListBoxRow) -> None:
         desktop_id = getattr(row, "desktop_id", None)
         if not desktop_id:
@@ -267,9 +458,7 @@ class GlyphWindow(Adw.ApplicationWindow):
         app = self._find(desktop_id)
         if app is None:
             return
-        self._detail_id = desktop_id
-        page = self._build_detail_page(app)
-        self.nav.push(page)
+        self._open_detail(app)
 
     def _build_detail_page(self, app: AppEntry) -> Adw.NavigationPage:
         toolbar = Adw.ToolbarView()
@@ -354,7 +543,13 @@ class GlyphWindow(Adw.ApplicationWindow):
 
         box.append(hero)
 
-        group = Adw.PreferencesGroup()
+        group = Adw.PreferencesGroup(title="Application details")
+
+        self._source_row = Adw.ActionRow(title="Package format")
+        group.add(self._source_row)
+
+        self._version_row = Adw.ActionRow(title="Version")
+        group.add(self._version_row)
 
         self._desktop_file_row = Adw.ActionRow(title="Desktop file")
         self._desktop_file_row.set_subtitle_lines(2)
@@ -376,10 +571,34 @@ class GlyphWindow(Adw.ApplicationWindow):
         self._app_folder_row.add_suffix(self._open_app_folder)
         group.add(self._app_folder_row)
 
+        self._appimage_row = Adw.ActionRow(title="AppImage binary")
+        self._appimage_row.set_subtitle_lines(2)
+        self._open_appimage_folder = Gtk.Button(icon_name="folder-open-symbolic")
+        self._open_appimage_folder.add_css_class("flat")
+        self._open_appimage_folder.set_valign(Gtk.Align.CENTER)
+        self._open_appimage_folder.set_tooltip_text("Open in Files")
+        self._open_appimage_folder.connect("clicked", self._on_open_appimage_folder)
+        self._appimage_row.add_suffix(self._open_appimage_folder)
+        group.add(self._appimage_row)
+
         self._command_row = Adw.ActionRow(title="Command")
         self._command_row.set_subtitle_lines(3)
         self._command_row.set_activatable(True)
         self._command_row.connect("activated", self._on_launch)
+
+        self._command_reset_btn = Gtk.Button(icon_name="edit-undo-symbolic")
+        self._command_reset_btn.add_css_class("flat")
+        self._command_reset_btn.set_valign(Gtk.Align.CENTER)
+        self._command_reset_btn.set_tooltip_text("Reset to original command")
+        self._command_reset_btn.connect("clicked", self._on_command_reset)
+        self._command_row.add_suffix(self._command_reset_btn)
+
+        self._command_edit_btn = Gtk.Button(icon_name="document-edit-symbolic")
+        self._command_edit_btn.add_css_class("flat")
+        self._command_edit_btn.set_valign(Gtk.Align.CENTER)
+        self._command_edit_btn.set_tooltip_text("Customize launch command")
+        self._command_edit_btn.connect("clicked", self._on_edit_command_clicked)
+        self._command_row.add_suffix(self._command_edit_btn)
 
         self._launch_btn = Gtk.Button(icon_name="media-playback-start-symbolic")
         self._launch_btn.add_css_class("flat")
@@ -389,6 +608,36 @@ class GlyphWindow(Adw.ApplicationWindow):
         self._command_row.add_suffix(self._launch_btn)
         group.add(self._command_row)
         box.append(group)
+
+        self._guidance_group = Adw.PreferencesGroup(title="Updates")
+
+        self._open_software_row = Adw.ActionRow(title="Open Software")
+        self._open_software_row.set_subtitle("View and manage updates in the Software app")
+        self._open_software_row.set_activatable(True)
+        self._open_software_row.add_prefix(Gtk.Image.new_from_icon_name("system-software-install-symbolic"))
+        self._open_software_row.add_suffix(Gtk.Image.new_from_icon_name("adw-external-link-symbolic"))
+        self._open_software_row.connect("activated", self._on_open_software)
+        self._guidance_group.add(self._open_software_row)
+
+        self._terminal_expander = Adw.ExpanderRow(title="Terminal update commands")
+        self._terminal_expander.set_subtitle("Commands to check and apply updates")
+        self._terminal_expander.add_prefix(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic"))
+
+        self._terminal_cmd_row = Adw.ActionRow()
+        self._terminal_cmd_copy_btn = Gtk.Button(icon_name="edit-copy-symbolic")
+        self._terminal_cmd_copy_btn.add_css_class("flat")
+        self._terminal_cmd_copy_btn.set_valign(Gtk.Align.CENTER)
+        self._terminal_cmd_copy_btn.set_tooltip_text("Copy command to clipboard")
+        self._terminal_cmd_copy_btn.connect("clicked", self._on_copy_terminal_cmd)
+        self._terminal_cmd_row.add_suffix(self._terminal_cmd_copy_btn)
+        self._terminal_expander.add_row(self._terminal_cmd_row)
+        self._guidance_group.add(self._terminal_expander)
+
+        self._guidance_info_row = Adw.ActionRow()
+        self._guidance_info_row.set_subtitle_lines(0)
+        self._guidance_group.add(self._guidance_info_row)
+
+        box.append(self._guidance_group)
 
         self._bottom_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self._bottom_box.set_halign(Gtk.Align.CENTER)
@@ -405,6 +654,13 @@ class GlyphWindow(Adw.ApplicationWindow):
         self._stock_button.set_tooltip_text("Restore the original stock name and icon provided by the package install")
         self._stock_button.connect("clicked", self._on_restore_stock)
         self._bottom_box.append(self._stock_button)
+
+        self._unregister_appimage_btn = Gtk.Button(label="Unregister AppImage launcher")
+        self._unregister_appimage_btn.add_css_class("destructive-action")
+        self._unregister_appimage_btn.add_css_class("pill")
+        self._unregister_appimage_btn.set_tooltip_text("Remove this launcher while preserving the AppImage binary files")
+        self._unregister_appimage_btn.connect("clicked", self._on_unregister_appimage)
+        self._bottom_box.append(self._unregister_appimage_btn)
 
         box.append(self._bottom_box)
 
@@ -442,40 +698,143 @@ class GlyphWindow(Adw.ApplicationWindow):
         source_lbl.add_css_class("dim-label")
         self._badge_box.append(source_lbl)
 
+        if getattr(app, "version", ""):
+            ver_lbl = Gtk.Label(label=f"·  v{app.version}")
+            ver_lbl.add_css_class("caption")
+            ver_lbl.add_css_class("dim-label")
+            self._badge_box.append(ver_lbl)
+
         if app.custom_icon:
-            icon_lbl = Gtk.Label(label="·  Custom Icon")
+            icon_kind = "Theme icon" if getattr(app, "is_theme_icon", False) else "Custom icon"
+            icon_lbl = Gtk.Label(label=f"·  {icon_kind}")
             icon_lbl.add_css_class("caption")
             icon_lbl.add_css_class("accent")
             self._badge_box.append(icon_lbl)
 
         if app.custom_name:
-            name_lbl = Gtk.Label(label="·  Custom Name")
+            name_lbl = Gtk.Label(label="·  Custom name")
             name_lbl.add_css_class("caption")
             name_lbl.add_css_class("accent")
             self._badge_box.append(name_lbl)
 
-        if is_shadowed and not app.custom_icon and not app.custom_name:
+        if getattr(app, "custom_command", False):
+            cmd_lbl = Gtk.Label(label="·  Custom command")
+            cmd_lbl.add_css_class("caption")
+            cmd_lbl.add_css_class("accent")
+            self._badge_box.append(cmd_lbl)
+
+        if is_shadowed and not app.custom_icon and not app.custom_name and not getattr(app, "custom_command", False):
             shadow_lbl = Gtk.Label(label="·  Override")
             shadow_lbl.add_css_class("caption")
             shadow_lbl.add_css_class("dim-label")
             self._badge_box.append(shadow_lbl)
 
+        if hasattr(self, "_source_row"):
+            scope_raw = getattr(app, "install_scope", "unknown")
+            scope_str = f" · {scope_raw.capitalize()} installation" if scope_raw != "unknown" else ""
+            self._source_row.set_subtitle(f"{app.source}{scope_str}")
+
+        if hasattr(self, "_version_row"):
+            ver = getattr(app, "version", "")
+            if ver:
+                prov = f" ({app.version_provenance})" if getattr(app, "version_provenance", "") else ""
+                self._version_row.set_subtitle(f"{ver}{prov}")
+                self._version_row.set_visible(True)
+            else:
+                self._version_row.set_visible(False)
+
+        if hasattr(self, "_appimage_row"):
+            ai_path = getattr(app, "appimage_path", "")
+            self._appimage_row.set_visible(bool(ai_path))
+            if ai_path:
+                self._appimage_row.set_subtitle(ai_path)
+
+        if hasattr(self, "_command_reset_btn"):
+            self._command_reset_btn.set_visible(bool(getattr(app, "custom_command", False)))
+
+        if hasattr(self, "_guidance_group"):
+            pkg_kind = getattr(app, "package_kind", "unknown")
+            inst_scope = getattr(app, "install_scope", "unknown")
+            ver = getattr(app, "version", "")
+            g = guidance.get_update_guidance(package_kind=pkg_kind, install_scope=inst_scope, version=ver, name=app.name)
+
+            self._guidance_group.set_title("Updates")
+            self._guidance_group.set_description(None)
+
+            if hasattr(self, "_open_software_row"):
+                self._open_software_row.set_visible(g.has_software_tool)
+                if g.has_software_tool:
+                    tool_title = f"Open {g.software_tool_name}" if g.software_tool_name else "Open Software"
+                    self._open_software_row.set_title(tool_title)
+
+            has_cmd = bool(getattr(g, "terminal_command", ""))
+            if hasattr(self, "_terminal_expander"):
+                self._terminal_expander.set_visible(has_cmd)
+                self._current_terminal_cmd = getattr(g, "terminal_command", "")
+                if has_cmd:
+                    self._terminal_cmd_row.set_title(g.terminal_command)
+                    self._terminal_cmd_row.set_subtitle("Run in terminal to check and apply updates")
+
+            if hasattr(self, "_guidance_info_row"):
+                self._guidance_info_row.set_visible(not has_cmd and not g.has_software_tool)
+                if not has_cmd and not g.has_software_tool:
+                    if pkg_kind == "appimage":
+                        self._guidance_info_row.set_title("Manual AppImage update")
+                        self._guidance_info_row.set_subtitle(
+                            "Download the updated AppImage and place it in ~/Applications to replace this version."
+                        )
+                    elif inst_scope == "user":
+                        self._guidance_info_row.set_title("User-managed application")
+                        self._guidance_info_row.set_subtitle(
+                            "Updates are managed manually by replacing or updating the target script or binary."
+                        )
+                    elif inst_scope == "system":
+                        self._guidance_info_row.set_title("System package")
+                        self._guidance_info_row.set_subtitle(
+                            "Updated along with your Linux distribution's system packages."
+                        )
+                    else:
+                        self._guidance_info_row.set_title("Unverified source")
+                        self._guidance_info_row.set_subtitle(
+                            "Version and update status are unknown. Check the application's website or documentation."
+                        )
+
+            # Test stub backwards compatibility
+            if hasattr(self, "_guidance_row"):
+                self._guidance_row.set_title(g.title)
+                self._guidance_row.set_subtitle(f"{g.summary}\n\n{g.instructions}")
+            if hasattr(self, "_open_software_btn"):
+                self._open_software_btn.set_visible(g.has_software_tool)
+
         self._revert_button.set_visible(app.custom_icon)
         self._stock_button.set_visible(is_shadowed)
-        self._bottom_box.set_visible(app.custom_icon or is_shadowed)
+
+        is_glyph_ai = False
+        if hasattr(self, "_unregister_appimage_btn"):
+            try:
+                state = load_state()
+                rec = state.get(app.desktop_id, {})
+                is_glyph_ai = bool(rec.get("glyph_managed_appimage"))
+            except Exception:
+                is_glyph_ai = False
+            self._unregister_appimage_btn.set_visible(is_glyph_ai)
+
+        self._bottom_box.set_visible(app.custom_icon or is_shadowed or is_glyph_ai)
 
         self._desktop_file_row.set_subtitle(app.filename or "No desktop file")
         self._open_desktop_file.set_sensitive(bool(app.filename))
         self._app_folder_row.set_subtitle(app.app_folder or "Unknown")
-        can_launch = bool(app.command or app.filename)
-        if in_flatpak():
+
+        can_launch = bool(getattr(app, "command", "") or getattr(app, "filename", ""))
+        if in_flatpak() and not launcher.can_launch_apps():
             can_launch = False
             self._command_row.set_tooltip_text("Launching external applications is not supported from within Flatpak sandbox")
             self._launch_btn.set_tooltip_text("Launching external applications is not supported from within Flatpak sandbox")
         else:
             self._command_row.set_tooltip_text(None)
             self._launch_btn.set_tooltip_text("Launch application")
-        self._command_row.set_subtitle(app.command or "No command")
+
+        self._command_row.set_subtitle(getattr(app, "command", "") or "No command")
         self._command_row.set_activatable(can_launch)
         self._launch_btn.set_sensitive(can_launch)
 
@@ -561,6 +920,12 @@ class GlyphWindow(Adw.ApplicationWindow):
     def _on_change(self, _button: Gtk.Button) -> None:
         if not self._detail_id:
             return
+        app = self._find(self._detail_id)
+        if app is None:
+            return
+        dialogs.show_icon_picker(self, app, on_open_file_callback=self._open_image_file_dialog)
+
+    def _open_image_file_dialog(self) -> None:
         dialog = Gtk.FileDialog(title="Choose an icon")
         image_filter = Gtk.FileFilter()
         image_filter.set_name("Images")
@@ -627,30 +992,94 @@ class GlyphWindow(Adw.ApplicationWindow):
         dialog.connect("response", on_response)
         dialog.present(self)
 
-    def _on_launch(self, _button: Gtk.Button) -> None:
+    def _on_edit_command_clicked(self, _widget: object) -> None:
         if not self._detail_id:
             return
         app = self._find(self._detail_id)
         if app is None:
             return
 
-        if in_flatpak():
-            self._toast("Launching external applications is not supported from within Flatpak sandbox.")
-            return
+        current_cmd = getattr(app, "command", "") or ""
+        dialog = Adw.AlertDialog(
+            heading=f"Customize launch command for {app.name}",
+            body="Enter a new launch command. This will be saved to your user-level launcher override.",
+        )
+        entry = Gtk.Entry(text=current_cmd)
+        entry.set_activates_default(True)
+        dialog.set_extra_child(entry)
 
-        info = GioUnix.DesktopAppInfo.new(app.desktop_id)
-        if not info and app.filename:
-            info = GioUnix.DesktopAppInfo.new_from_filename(app.filename)
-        if not info and app.stock_filename:
-            info = GioUnix.DesktopAppInfo.new_from_filename(app.stock_filename)
-        if not info:
-            self._toast("Could not create launcher.")
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("save", "Save")
+        dialog.set_default_response("save")
+        dialog.set_close_response("cancel")
+
+        def on_response(_d, response):
+            if response == "save":
+                new_cmd = entry.get_text().strip()
+                if not new_cmd:
+                    self._toast("Command cannot be empty.")
+                    return
+                if new_cmd == current_cmd:
+                    return
+                source_desktop = app.filename or app.stock_filename
+                if not source_desktop:
+                    self._toast("No desktop file found to override.")
+                    return
+                try:
+                    apply_command(app.desktop_id, source_desktop, new_cmd)
+                except OverrideError as exc:
+                    self._toast(str(exc))
+                    return
+                self.reload()
+                self._toast("Custom command saved.")
+
+        dialog.connect("response", on_response)
+        dialog.present(self)
+
+    def _on_command_reset(self, _button: Gtk.Button) -> None:
+        if not self._detail_id:
             return
         try:
-            info.launch([], None)
+            revert_command(self._detail_id)
+        except OverrideError as exc:
+            self._toast(str(exc))
+            return
+        self.reload()
+        self._toast("Original command restored.")
+
+    def _on_launch(self, _button: Gtk.Button) -> None:
+        if not self._detail_id:
+            return
+        app = self._find(self._detail_id)
+        if app is None:
+            return
+        try:
+            launcher.launch(app)
             self._toast(f"Launched {app.name}.")
+        except launcher.LaunchError as exc:
+            self._toast(f"Failed to launch: {exc}")
         except Exception as exc:
             self._toast(f"Failed to launch: {exc}")
+
+    def _on_open_software(self, *_) -> None:
+        target_id = ""
+        if self._detail_id:
+            app = self._find(self._detail_id)
+            if app:
+                target_id = getattr(app, "flatpak_id", "") or app.desktop_id.removesuffix(".desktop")
+            else:
+                target_id = self._detail_id.removesuffix(".desktop")
+        guidance.open_software_tool(target_id)
+
+    def _on_copy_terminal_cmd(self, _button: Gtk.Button) -> None:
+        cmd = getattr(self, "_current_terminal_cmd", "")
+        if not cmd:
+            return
+        display = Gdk.Display.get_default()
+        if display:
+            clipboard = display.get_clipboard()
+            clipboard.set(cmd)
+            self._toast("Command copied to clipboard.")
 
     def _on_open_desktop_file(self, _button: Gtk.Button) -> None:
         if not self._detail_id:
@@ -658,8 +1087,8 @@ class GlyphWindow(Adw.ApplicationWindow):
         app = self._find(self._detail_id)
         if app is None or not app.filename:
             return
-        launcher = Gtk.FileLauncher.new(Gio.File.new_for_path(app.filename))
-        launcher.open_containing_folder(self, None, self._on_open_file_done)
+        launcher_obj = Gtk.FileLauncher.new(Gio.File.new_for_path(app.filename))
+        launcher_obj.open_containing_folder(self, None, self._on_open_file_done)
 
     def _on_open_app_folder(self, _button: Gtk.Button) -> None:
         if not self._detail_id:
@@ -667,8 +1096,217 @@ class GlyphWindow(Adw.ApplicationWindow):
         app = self._find(self._detail_id)
         if app is None or not app.app_folder:
             return
-        launcher = Gtk.FileLauncher.new(Gio.File.new_for_path(app.app_folder))
-        launcher.launch(self, None, self._on_open_folder_done)
+        launcher_obj = Gtk.FileLauncher.new(Gio.File.new_for_path(app.app_folder))
+        launcher_obj.launch(self, None, self._on_open_folder_done)
+
+    def _on_open_appimage_folder(self, _button: Gtk.Button) -> None:
+        if not self._detail_id:
+            return
+        app = self._find(self._detail_id)
+        if app is None:
+            return
+        ai_path = getattr(app, "appimage_path", "")
+        if not ai_path or not Path(ai_path).exists():
+            self._toast("AppImage file not found.")
+            return
+        launcher_obj = Gtk.FileLauncher.new(Gio.File.new_for_path(ai_path))
+        launcher_obj.open_containing_folder(self, None, self._on_open_file_done)
+
+    def _on_unregister_appimage(self, _button: Gtk.Button) -> None:
+        if not self._detail_id:
+            return
+        app = self._find(self._detail_id)
+        if app is None:
+            return
+
+        dialog = Adw.AlertDialog(
+            heading=f"Unregister launcher for {app.name}?",
+            body=(
+                "This will remove the desktop launcher and custom icons created by Glyph, "
+                "leaving the AppImage binary files intact in your Applications folder."
+            ),
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("unregister", "Unregister Launcher")
+        dialog.set_response_appearance("unregister", Adw.ResponseAppearance.DESTRUCTIVE)
+
+        def on_response(_d, response):
+            if response == "unregister":
+                try:
+                    res = appimage.unregister_appimage(app.desktop_id)
+                except Exception as exc:
+                    self._toast(str(exc))
+                    return
+                self.nav.pop()
+                self._detail_id = None
+                self.reload()
+                if res and res.get("icon_skipped"):
+                    self._toast(f"Unregistered launcher for {app.name}. Modified icon and binary file preserved.")
+                else:
+                    self._toast(f"Unregistered launcher for {app.name}. Binary file preserved.")
+
+        dialog.connect("response", on_response)
+        dialog.present(self)
+
+    def _on_add_appimage(self, *_args) -> None:
+        dialog = Gtk.FileDialog(title="Choose an AppImage")
+        filter_ai = Gtk.FileFilter()
+        filter_ai.set_name("AppImage Files")
+        filter_ai.add_pattern("*.AppImage")
+        filter_ai.add_pattern("*.appimage")
+        filter_ai.add_mime_type("application/vnd.appimage")
+        filter_ai.add_mime_type("application/x-iso9660-appimage")
+        filter_ai.add_mime_type("application/x-executable")
+
+        filter_all = Gtk.FileFilter()
+        filter_all.set_name("All Files")
+        filter_all.add_pattern("*")
+
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(filter_ai)
+        filters.append(filter_all)
+        dialog.set_filters(filters)
+
+        def on_open_done(dlg: Gtk.FileDialog, res: Gio.AsyncResult):
+            try:
+                file = dlg.open_finish(res)
+            except GLib.GError:
+                return
+            if not file:
+                return
+            path_str = file.get_path()
+            if not path_str:
+                self._toast("Selected file is not available as a local path.")
+                return
+            source_file = Path(path_str)
+            try:
+                plan = appimage.plan_appimage_registration(source_file)
+            except (appimage.AppImageError, ValueError) as exc:
+                self._toast(f"Cannot register AppImage: {exc}")
+                return
+            self._show_appimage_registration_preview(plan)
+
+        dialog.open(self, None, on_open_done)
+
+    def _show_appimage_registration_preview(
+        self,
+        plan: appimage.AppImageRegistrationPlan,
+        *,
+        open_detail: bool = True,
+    ) -> None:
+        app_name = plan.display_name
+        body_lines = [
+            f"Source: {plan.source_file}",
+        ]
+        if not plan.is_in_place:
+            body_lines.append(f"Destination: {plan.managed_file} (copy to ~/Applications)")
+            if plan.managed_collision:
+                body_lines.append("\n⚠️ Warning: A file with this name already exists in ~/Applications.")
+        else:
+            body_lines.append(f"Location: {plan.managed_file} (already in ~/Applications)")
+
+        body_lines.append(f"Launcher: {plan.launcher_path.name}")
+        if plan.launcher_collision:
+            body_lines.append("\n⚠️ Warning: A desktop launcher with this ID already exists.")
+
+        body_lines.append("\nThe original source file will remain untouched.")
+
+        dialog = Adw.AlertDialog(
+            heading=f"Register AppImage for {app_name}?",
+            body="\n".join(body_lines),
+        )
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+        box.set_margin_top(6)
+        box.set_margin_bottom(6)
+
+        name_entry = Gtk.Entry(text=app_name)
+        name_entry.set_placeholder_text("Application Name")
+        box.append(name_entry)
+
+        launcher_info = Gtk.Label(
+            label=f"Desktop launcher: {plan.desktop_id}",
+            xalign=0,
+            css_classes=["dim-label", "caption"],
+        )
+        box.append(launcher_info)
+
+        collision_warning = Gtk.Label(
+            label="",
+            xalign=0,
+            wrap=True,
+            css_classes=["error", "caption"],
+        )
+        collision_warning.set_visible(False)
+        box.append(collision_warning)
+
+        dialog.set_extra_child(box)
+
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("register", "Register AppImage")
+
+        def update_state() -> None:
+            chosen = name_entry.get_text().strip() or app_name
+            derived_id = appimage.derive_desktop_id(chosen)
+            launcher_info.set_text(f"Desktop launcher: {derived_id}")
+            candidate_launcher = appimage.APPLICATIONS_DIR / derived_id
+
+            has_launcher_col = candidate_launcher.exists()
+            has_col = plan.managed_collision or has_launcher_col
+            if has_launcher_col:
+                collision_warning.set_text("⚠️ A desktop launcher with this ID already exists.")
+                collision_warning.set_visible(True)
+            elif plan.managed_collision:
+                collision_warning.set_text("⚠️ A file with this name already exists in ~/Applications.")
+                collision_warning.set_visible(True)
+            else:
+                collision_warning.set_visible(False)
+
+            if has_col:
+                dialog.set_default_response("cancel")
+            else:
+                dialog.set_default_response("register")
+
+        name_entry.connect("changed", lambda _e: update_state())
+        update_state()
+        dialog.set_close_response("cancel")
+
+        def on_resp(_d, resp):
+            if resp == "register":
+                chosen = name_entry.get_text().strip() or app_name
+                try:
+                    result_id = appimage.register_appimage(plan, chosen_name=chosen)
+                except (appimage.AppImageError, OverrideError, OSError) as exc:
+                    self._toast(f"Registration failed: {exc}")
+                    return
+                self.reload()
+                self._toast(f"Registered {chosen} in application grid.")
+                app = self._find(result_id)
+                if open_detail and app is not None:
+                    self._open_detail(app)
+                elif not open_detail:
+                    self.nav.pop()
+
+        dialog.connect("response", on_resp)
+        dialog.present(self)
+
+    def _on_integrate_glyph(self, *_args) -> None:
+        ai_env = os.environ.get("APPIMAGE")
+        if not ai_env:
+            self._toast("Glyph is not currently running from an AppImage.")
+            return
+        ai_path = Path(ai_env)
+        if not ai_path.is_file():
+            self._toast(f"AppImage file not found at {ai_path}.")
+            return
+        try:
+            plan = appimage.plan_appimage_registration(ai_path)
+        except (appimage.AppImageError, ValueError) as exc:
+            self._toast(f"Cannot integrate Glyph: {exc}")
+            return
+        self._show_appimage_registration_preview(plan)
 
     def _on_open_folder_done(self, launcher: Gtk.FileLauncher, result: Gio.AsyncResult) -> None:
         try:

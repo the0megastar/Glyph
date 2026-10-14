@@ -11,7 +11,7 @@ if [[ "$build_os" != ubuntu:24.04 ]]; then
 fi
 ARCH="${ARCH:-$(uname -m)}"
 [[ "$ARCH" == "$(uname -m)" ]] || { echo "Cross-compilation is not supported." >&2; exit 1; }
-VERSION="${VERSION:-0.1.3}"
+VERSION="${VERSION:-0.1.5}"
 APPDIR="${APPDIR:-$(pwd)/_AppDir_${ARCH}}"
 OUTPUT="${OUTPUT:-Glyph-${VERSION}-${ARCH}.AppImage}"
 
@@ -40,12 +40,15 @@ chmod +x "${APPDIR}/usr/bin/glyph"
 
 cp data/io.github.the0megastar.Glyph.desktop "${APPDIR}/usr/share/applications/"
 cp data/io.github.the0megastar.Glyph.desktop "${APPDIR}/"
+sed -i 's|^Exec=glyph|Exec=AppRun|' "${APPDIR}/io.github.the0megastar.Glyph.desktop"
+sed -i 's|^Exec=glyph|Exec=AppRun|' "${APPDIR}/usr/share/applications/io.github.the0megastar.Glyph.desktop"
+
 cp data/io.github.the0megastar.Glyph.metainfo.xml "${APPDIR}/usr/share/metainfo/"
 cp data/icons/io.github.the0megastar.Glyph.svg "${APPDIR}/usr/share/icons/hicolor/scalable/apps/"
 cp data/icons/io.github.the0megastar.Glyph.svg "${APPDIR}/io.github.the0megastar.Glyph.svg"
 if [ -f "data/icons/io.github.the0megastar.Glyph.png" ]; then
-  mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
-  cp data/icons/io.github.the0megastar.Glyph.png "${APPDIR}/usr/share/icons/hicolor/256x256/apps/"
+  mkdir -p "${APPDIR}/usr/share/icons/hicolor/1024x1024/apps"
+  cp data/icons/io.github.the0megastar.Glyph.png "${APPDIR}/usr/share/icons/hicolor/1024x1024/apps/"
   cp data/icons/io.github.the0megastar.Glyph.png "${APPDIR}/io.github.the0megastar.Glyph.png"
   cp data/icons/io.github.the0megastar.Glyph.png "${APPDIR}/.DirIcon"
 else

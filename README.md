@@ -78,15 +78,20 @@ Glyph is built using GTK4 and Libadwaita, and follows FreeDesktop.org (XDG) stan
 
 ## Features
 
-- **App-by-App Icon Customization**: Click "Change icon" or drag and drop any image (`.png`, `.svg`, `.webp`, `.jpg`) directly onto the 96px icon preview.
+- **Icon Theme Browser & Picker**: Browse real installed desktop icon themes or search by icon name. Choose whether the customized icon follows theme changes or remains fixed artwork.
+- **Custom Image Artwork**: Drag and drop any image (`.png`, `.svg`, `.webp`, `.jpg`) directly onto the icon preview or select a local image file.
 - **Custom Application Display Names**: Rename any application launcher right from the app page with automatic locale stripping and one-click undo (↺).
+- **Custom Launch Command Editor**: Modify the start command for any application with one-click restoration back to the original executable.
+- **Package Classification & Provenance**: Accurate detection of package sources (RPM, Flatpak, DEB, Pacman, Snap, AppImage), install scope (System vs. User), and recorded version provenance.
+- **AppImage Discovery & Lifecycle**: Browse AppImages in `~/Applications`. Register external AppImages with safe, atomic copying to `~/Applications` while leaving original files untouched. Cleanly unregister launchers without deleting application binaries.
+- **Informational Install & Update Guidance**: Source-aware assistance explaining how detected packages are maintained and updated on your distribution, with quick access to the Software app.
+- **Unified App Launching**: Direct launch verification supporting both native host execution and Flatpak host spawning via `flatpak-spawn`.
 - **Customized Filter**: Dropdown menu on the header bar to quickly filter between all installed applications and only those with active customizations.
 - **Restore Stock & Revert**:
-  - Revert custom icons or reset custom display names independently.
+  - Revert custom icons, display names, or commands independently.
   - For applications with local overrides shadowing system or Flatpak packages, click "Restore system default launcher" to safely remove the local override and restore upstream defaults.
-- **App Details & Quick Launch**: Inspect the resolved **App folder**, **Desktop file**, and start **Command** with buttons to open locations in Files, plus a header **Launch** button to test and preview your launcher in the dash immediately.
-- **Empty States**: Native `Adw.StatusPage` illustrations when searches yield no matches or when no apps have been customized.
 - **Primary Menu**:
+  - **Add AppImage…**: Register an AppImage into your desktop app grid.
   - **Backup & Restore Overrides**: Export or import your customizations as a portable v2 `.tar.gz` bundle for backups or dotfile synchronization across machines.
   - **Reset Overrides Submenu**: Keeps bulk icon, name, and system-default reset actions together and away from routine actions.
   - **Open Data Folder in Files**: Inspect `~/.local/share/glyph/` directly.
@@ -97,10 +102,11 @@ Glyph is built using GTK4 and Libadwaita, and follows FreeDesktop.org (XDG) stan
 
 ## Sources
 
-- **System**: Native applications installed system-wide via distro package managers (RPM, DEB, Pacman, etc.) under `/usr/share/applications/`.
-- **Flatpak**: Sandboxed Flatpak applications from system or user installations.
-- **Snap**: Applications installed via Snap.
-- **Local**: Applications installed directly in user space (e.g. `~/.local/bin/` or custom AppImage launchers).
+- **RPM / DEB / Pacman**: Native packages installed through your Linux distribution's package manager.
+- **Flatpak**: Isolated applications installed via Flatpak (system or per-user scope).
+- **Snap**: Applications installed via Snap confinement.
+- **AppImage**: Standalone executable applications discovered or registered in `~/Applications`.
+- **User / Local**: Locally created desktop entries in `~/.local/share/applications/`.
 
 ---
 
@@ -147,7 +153,10 @@ Glyph is engineered from the ground up to protect your system integrity and priv
   Standalone Flatpak packages use read-only host filesystem access exclusively to inspect installed application launchers (`/usr/share/applications`) and their icons. This allows Glyph to discover and customize native RPM, DEB, Pacman, and AUR packages safely without needing root privileges.
 
 - **Flatpak Scoped Access**  
-  Read-only access to system and user Flatpak directories (`/var/lib/flatpak` and `~/.local/share/flatpak`) allows reading launcher entries and resolving application assets.
+  Read-only access to system and user Flatpak directories (`/var/lib/flatpak` and `~/.local/share/flatpak`) allows reading launcher entries and resolving application assets. Scoped write access to `~/Applications` (`--filesystem=~/Applications:create`) allows managing and copying AppImages with host-visible execution paths.
+
+- **Host Application Launching (`org.freedesktop.Flatpak`)**  
+  Standalone Flatpak builds request the `org.freedesktop.Flatpak` session bus grant to invoke external host applications (`gtk-launch <desktop-id>`) via `flatpak-spawn --host`. This permission enables starting commands with the privileges of the logged-in host user to achieve desktop launch parity. This is an accepted trust tradeoff: while Glyph's internal API restricts itself to validated application IDs, the underlying D-Bus permission inherently allows requesting arbitrary commands as the host user and is not a security boundary against compromised sandbox code.
 
 - **Native Desktop Portals**  
   File selection dialogs run through native desktop portals, ensuring the sandbox only receives access to the specific image files you select.

@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gi.repository import Adw, Gio, GLib, Gtk
+from gi.repository import Adw, Gio, GLib, Gtk, Pango
 
+from glyph.icon_themes import ThemeIcon, list_installed_themes, search_theme_icons
 from glyph.overrides import (
     OverrideError,
+    apply_icon,
+    apply_theme_icon,
     export_backup,
     import_backup,
     load_state,
@@ -241,3 +244,145 @@ def handle_import_open_done(parent: Gtk.Widget | None, dlg: Gtk.FileDialog, resu
 def import_overrides_dialog(parent: Gtk.Widget | None) -> None:
     dialog = Gtk.FileDialog(title="Restore Overrides Backup")
     dialog.open(parent, None, lambda dlg, res: handle_import_open_done(parent, dlg, res))
+
+
+def show_icon_picker(parent: Gtk.Widget | None, app: object, on_open_file_callback=None) -> None:
+    themes = list_installed_themes()
+    if not themes:
+        if on_open_file_callback:
+            on_open_file_callback()
+        return
+
+    dialog = Adw.Window(title="Change Icon")
+    dialog.set_default_size(580, 520)
+    dialog.set_modal(True)
+    if parent:
+        dialog.set_transient_for(parent)
+
+    toolbar = Adw.ToolbarView()
+    header = Adw.HeaderBar()
+
+    file_btn = Gtk.Button(label="Image File…")
+    file_btn.set_tooltip_text("Choose a custom image file (PNG, SVG, WebP, JPG)")
+
+    def on_choose_file(_btn):
+        dialog.close()
+        if on_open_file_callback:
+            on_open_file_callback()
+
+    file_btn.connect("clicked", on_choose_file)
+    header.pack_end(file_btn)
+    toolbar.add_top_bar(header)
+
+    content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+    content_box.set_margin_top(12)
+    content_box.set_margin_bottom(12)
+    content_box.set_margin_start(16)
+    content_box.set_margin_end(16)
+
+    controls_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+    search_entry = Gtk.SearchEntry(placeholder_text="Search icon name…")
+    search_entry.set_hexpand(True)
+    controls_box.append(search_entry)
+
+    theme_names = [t.name for t in themes]
+    string_list = Gtk.StringList.new(theme_names)
+    dropdown = Gtk.DropDown.new(string_list, None)
+    dropdown.set_selected(0)
+    controls_box.append(dropdown)
+    content_box.append(controls_box)
+
+    hint_lbl = Gtk.Label(label="Browse installed icon themes or search by icon name. Click to apply.")
+    hint_lbl.add_css_class("caption")
+    hint_lbl.add_css_class("dim-label")
+    hint_lbl.set_halign(Gtk.Align.START)
+    content_box.append(hint_lbl)
+
+    scrolled = Gtk.ScrolledWindow()
+    scrolled.set_vexpand(True)
+    flowbox = Gtk.FlowBox()
+    flowbox.set_valign(Gtk.Align.START)
+    flowbox.set_max_children_per_line(8)
+    flowbox.set_min_children_per_line(3)
+    flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
+    flowbox.set_row_spacing(8)
+    flowbox.set_column_spacing(8)
+    scrolled.set_child(flowbox)
+    content_box.append(scrolled)
+
+    toolbar.set_content(content_box)
+    dialog.set_content(toolbar)
+
+    def on_icon_clicked(icon: ThemeIcon):
+        app_name = getattr(app, "name", "application")
+        choice = Adw.AlertDialog(
+            heading=f"Apply icon '{icon.name}'?",
+            body=(
+                f"Choose how to apply this icon for {app_name}:\n\n"
+                "• Theme Icon: The application will follow changes when you switch desktop icon themes.\n\n"
+                "• Fixed Artwork: Copies the icon file so it remains fixed even if the theme changes."
+            ),
+        )
+        choice.add_response("cancel", "Cancel")
+        choice.add_response("fixed", "Fixed Artwork")
+        choice.add_response("theme", "Theme Icon")
+        choice.set_response_appearance("theme", Adw.ResponseAppearance.SUGGESTED)
+        choice.set_default_response("theme")
+        choice.set_close_response("cancel")
+
+        def on_choice_resp(_d, resp):
+            if resp in ("theme", "fixed"):
+                dialog.close()
+                source_desktop = getattr(app, "filename", "") or getattr(app, "stock_filename", "")
+                desktop_id = getattr(app, "desktop_id", "")
+                try:
+                    if resp == "theme":
+                        apply_theme_icon(desktop_id, source_desktop, icon.name)
+                        _toast(parent, f"Theme icon '{icon.name}' applied.")
+                    else:
+                        apply_icon(desktop_id, source_desktop, icon.file_path)
+                        _toast(parent, f"Fixed icon '{icon.name}' applied.")
+                except OverrideError as exc:
+                    _toast(parent, str(exc))
+                    return
+                _reload(parent)
+
+        choice.connect("response", on_choice_resp)
+        choice.present(dialog)
+
+    def refresh_icons(*_args):
+        while child := flowbox.get_first_child():
+            flowbox.remove(child)
+
+        idx = dropdown.get_selected()
+        if idx >= len(themes):
+            return
+        current_theme = themes[idx]
+        query = search_entry.get_text()
+        icons = search_theme_icons(current_theme.theme_id, query)
+
+        for icon in icons:
+            btn = Gtk.Button()
+            btn.add_css_class("flat")
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            box.set_halign(Gtk.Align.CENTER)
+            box.set_size_request(64, 64)
+            img = Gtk.Image.new_from_icon_name(icon.name)
+            img.set_pixel_size(36)
+            box.append(img)
+
+            lbl = Gtk.Label(label=icon.name)
+            lbl.set_max_width_chars(8)
+            lbl.set_ellipsize(Pango.EllipsizeMode.END)
+            lbl.add_css_class("caption")
+            box.append(lbl)
+
+            btn.set_child(box)
+            btn.set_tooltip_text(f"{icon.name} ({icon.context})")
+            btn.connect("clicked", lambda _b, ic=icon: on_icon_clicked(ic))
+            flowbox.append(btn)
+
+    search_entry.connect("search-changed", refresh_icons)
+    dropdown.connect("notify::selected", refresh_icons)
+    refresh_icons()
+    dialog.present()

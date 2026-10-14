@@ -10,11 +10,20 @@ finish-args:
   - --socket=wayland
   - --device=dri
   - --filesystem=xdg-data/applications:create
+  # Scoped access to user's Applications directory for AppImage registration and management
+  - --filesystem=~/Applications:create
+  # Scoped read-only access to host user's icon theme directories
+  - --filesystem=xdg-data/icons:ro
+  - --filesystem=~/.icons:ro
   - --filesystem=host-os:ro
   - --filesystem=/var/lib/flatpak/exports/share:ro
   - --filesystem=/var/lib/flatpak/app:ro
   - --filesystem=xdg-data/flatpak/exports/share:ro
   - --filesystem=xdg-data/flatpak/app:ro
+  # Broad host command capability enabling flatpak-spawn --host to launch external desktop
+  # applications as the logged-in host user. This permission allows requesting arbitrary
+  # commands as the host user and is not a security boundary against compromised sandbox code.
+  - --talk-name=org.freedesktop.Flatpak
 
 cleanup:
   - /include

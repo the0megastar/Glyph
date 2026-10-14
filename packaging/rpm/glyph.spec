@@ -1,5 +1,5 @@
 Name:           glyph
-Version:        0.1.3
+Version:        0.1.5
 Release:        1%{?dist}
 Summary:        Customize application launcher icons and names on Linux
 License:        GPL-3.0-or-later
@@ -63,5 +63,8 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 %{_datadir}/glib-2.0/schemas/io.github.the0megastar.Glyph.gschema.xml
 
 %changelog
+* Tue Oct 13 2026 the0megastar <the0megastar@users.noreply.github.com> - 0.1.5-1
+- Version 0.1.5: package classification, icon-theme browser, launch adapter, command editor, AppImage registration, and install guidance
+
 * Sun Sep 06 2026 the0megastar <the0megastar@users.noreply.github.com> - 0.1.3-1
 - Version 0.1.3: overrides, transaction journal, bulk revert names, v2 backups, and hardened paths

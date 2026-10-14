@@ -34,15 +34,18 @@ from glyph.desktop_text import (
     _escape,
     _replace_lines,
     _snapshot_lines,
+    get_exec_value,
     get_icon_value,
     get_name_value,
+    set_exec_value,
     set_icon_value,
     set_name_value,
 )
-from glyph.paths import data_home, desktop_index, find_stock, host_data_home, in_flatpak
+from glyph.paths import data_home, desktop_index, find_stock, in_flatpak
 
 XDG_DATA_HOME = data_home()
-APPLICATIONS_DIR = host_data_home() / 'applications'
+APPLICATIONS_DIR = data_home() / 'applications'
+FLATPAK_LAUNCHER_STORAGE = 'host-xdg-applications-v1'
 DATA_DIR = XDG_DATA_HOME / 'glyph'
 ICONS_DIR = DATA_DIR / 'icons'
 STATE_FILE = DATA_DIR / 'overrides.json'
@@ -223,26 +226,52 @@ def _validate_state(state) -> dict[str, dict]:
         if not isinstance(record, dict):
             raise OverrideError('Invalid override record. Keep overrides.json for recovery.')
         for key in ('local_desktop', 'source_path', 'original_icon', 'original_name', 'custom_name',
-                    'icon_path', 'original_text', 'last_hash'):
+                    'icon_path', 'original_text', 'last_hash', 'theme_icon', 'original_command',
+                    'custom_command', 'appimage_source', 'appimage_managed'):
             if key in record and not isinstance(record[key], str):
                 raise OverrideError(f'Invalid {key} in override state.')
-        if type(record.get('created_local', False)) is not bool:
-            raise OverrideError('Invalid ownership in override state.')
+        for bool_key in ('created_local', 'glyph_managed_appimage'):
+            if bool_key in record and type(record[bool_key]) is not bool:
+                raise OverrideError(f'Invalid {bool_key} in override state.')
+        storage = record.get('launcher_storage', '')
+        if storage and storage != FLATPAK_LAUNCHER_STORAGE:
+            raise OverrideError('Invalid launcher storage marker in override state.')
         recorded_local = Path(record.get('local_desktop', ''))
-        if (in_flatpak() and recorded_local.is_relative_to(XDG_DATA_HOME / 'applications')
-                and not recorded_local.is_relative_to(APPLICATIONS_DIR)):
-            raise OverrideError(
-                'Preferences from an older Flatpak build refer to private launchers. '
-                'Export them using that build, then move the old overrides.json aside '
-                'and import the backup here. '
-                f'Previous data has been preserved in {DATA_DIR}.')
+        if in_flatpak():
+            if recorded_local.is_relative_to(APPLICATIONS_DIR):
+                # Flatpak's xdg-data/applications mount has the same sandbox path
+                # that older builds used for private launchers. Paths alone cannot
+                # distinguish those files, so only accept state written with the
+                # explicit host-storage marker introduced with this layout.
+                if storage != FLATPAK_LAUNCHER_STORAGE:
+                    raise OverrideError(
+                        'This Flatpak has launcher preferences from an older or '
+                        'unmarked build. They cannot be safely matched to host '
+                        'launchers. Export preferences with the previous build, '
+                        'then move the old overrides.json aside and import the backup. '
+                        f'Previous data has been preserved in {DATA_DIR}.')
+            else:
+                if recorded_local.is_relative_to(XDG_DATA_HOME / 'applications'):
+                    raise OverrideError(
+                        'Preferences from an older Flatpak build refer to private launchers. '
+                        'Export them using that build, then move the old overrides.json aside '
+                        'and import the backup here. '
+                        f'Previous data has been preserved in {DATA_DIR}.')
+                candidate = APPLICATIONS_DIR / recorded_local.name
+                if candidate.is_relative_to(APPLICATIONS_DIR) and recorded_local.name == desktop_id:
+                    recorded_local = candidate
+                    record['local_desktop'] = str(recorded_local)
+                    record['launcher_storage'] = FLATPAK_LAUNCHER_STORAGE
+                    if record.get('source_path') and Path(record['source_path']).name == desktop_id:
+                        record['source_path'] = str(recorded_local)
         local = _confined(recorded_local, APPLICATIONS_DIR)
         if '-'.join(local.relative_to(APPLICATIONS_DIR).parts) != desktop_id:
             raise OverrideError(f'Launcher path does not match {desktop_id}. Keep overrides.json for recovery.')
         if record.get('icon_path'):
             _confined(Path(record['icon_path']), ICONS_DIR)
-        for key in ('Name', 'Icon'):
-            saved = record.get('original_' + key.lower() + '_lines')
+        for key in ('Name', 'Icon', 'Exec'):
+            saved_key = 'exec' if key == 'Exec' else key.lower()
+            saved = record.get('original_' + saved_key + '_lines')
             if saved is not None and (not isinstance(saved, list) or any(
                     not isinstance(line, str) or '\n' in line.rstrip('\n') or
                     not re.fullmatch(key + r'(?:\[[^\]\r\n]+\])?\s*=[^\r\n]*\n?', line.strip('\n'))
@@ -361,6 +390,8 @@ def _prepare(state: dict, desktop_id: str, source_desktop: str):
     if not record:
         record = {'created_local': not local.exists(), 'source_path': str(source),
                   'local_desktop': str(local), 'original_text': text}
+    if in_flatpak():
+        record['launcher_storage'] = FLATPAK_LAUNCHER_STORAGE
     return local, text, record
 
 
@@ -403,7 +434,7 @@ def validate_image(data: bytes, suffix: str) -> None:
         raise OverrideError(f'The selected image cannot be decoded: {exc.message}') from exc
 
 
-def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=None):
+def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=None, theme_icon=None, command=None):
     local, text, record = _prepare(state, desktop_id, source_desktop)
     writes = {}
     if image is not None:
@@ -411,15 +442,45 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
         id_hash = hashlib.sha256(desktop_id.encode('utf-8')).hexdigest()[:16]
         img_hash = hashlib.sha256(image).hexdigest()[:16]
         dest = ICONS_DIR / f'{id_hash}-{img_hash}{suffix.lower()}'
-        if not record.get('icon_path'):
+        if not record.get('icon_path') and not record.get('theme_icon'):
             record['original_icon'] = get_icon_value(text)
             record['original_icon_lines'] = _snapshot_lines(text, 'Icon')
         old = record.get('icon_path')
+        old_hash = record.get('icon_hash')
+        record.pop('theme_icon', None)
         record['icon_path'] = str(dest)
+        record['icon_hash'] = hashlib.sha256(image).hexdigest()
         writes[dest] = image
         text = set_icon_value(text, str(dest))
         if old and old != str(dest) and not any(r.get('icon_path') == old for k, r in state.items() if k != desktop_id):
-            writes[Path(old)] = None
+            old_path = Path(old)
+            if old_hash and old_path.is_file():
+                try:
+                    if hashlib.sha256(old_path.read_bytes()).hexdigest() == old_hash:
+                        writes[old_path] = None
+                except OSError:
+                    pass
+    if theme_icon is not None:
+        theme_icon = theme_icon.strip()
+        if not theme_icon or len(theme_icon) > 256 or '/' in theme_icon or '\\' in theme_icon or any(ord(c) < 32 for c in theme_icon):
+            raise OverrideError('Invalid icon theme name.')
+        if not record.get('icon_path') and not record.get('theme_icon'):
+            record['original_icon'] = get_icon_value(text)
+            record['original_icon_lines'] = _snapshot_lines(text, 'Icon')
+        old = record.get('icon_path')
+        old_hash = record.get('icon_hash')
+        record.pop('icon_path', None)
+        record.pop('icon_hash', None)
+        record['theme_icon'] = theme_icon
+        text = set_icon_value(text, theme_icon)
+        if old and not any(r.get('icon_path') == old for k, r in state.items() if k != desktop_id):
+            old_path = Path(old)
+            if old_hash and old_path.is_file():
+                try:
+                    if hashlib.sha256(old_path.read_bytes()).hexdigest() == old_hash:
+                        writes[old_path] = None
+                except OSError:
+                    pass
     if name is not None:
         name = name.strip()
         if not name or len(name) > 256 or any(ord(c) < 32 for c in name):
@@ -429,6 +490,15 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
             record['original_name_lines'] = _snapshot_lines(text, 'Name')
         record['custom_name'] = name
         text = set_name_value(text, name)
+    if command is not None:
+        command = command.strip()
+        if not command or len(command) > 1024 or any(ord(c) < 32 and c not in '\t ' for c in command):
+            raise OverrideError('Enter a valid command of 1–1024 characters.')
+        if not record.get('custom_command'):
+            record['original_command'] = get_exec_value(text)
+            record['original_exec_lines'] = _snapshot_lines(text, 'Exec')
+        record['custom_command'] = command
+        text = set_exec_value(text, command)
     record['last_hash'] = _digest(text.encode())
     state[desktop_id] = record
     writes[local] = text.encode()
@@ -449,8 +519,22 @@ def apply_icon(desktop_id: str, source_desktop: str, image_path: str) -> dict:
 
 
 @operation
+def apply_theme_icon(desktop_id: str, source_desktop: str, icon_name: str) -> dict:
+    record = _apply(load_state(), desktop_id, source_desktop, theme_icon=icon_name)
+    refresh_desktop_database()
+    return record
+
+
+@operation
 def apply_name(desktop_id: str, source_desktop: str, new_name: str) -> dict:
     record = _apply(load_state(), desktop_id, source_desktop, name=new_name)
+    refresh_desktop_database()
+    return record
+
+
+@operation
+def apply_command(desktop_id: str, source_desktop: str, new_command: str) -> dict:
+    record = _apply(load_state(), desktop_id, source_desktop, command=new_command)
     refresh_desktop_database()
     return record
 
@@ -458,28 +542,38 @@ def apply_name(desktop_id: str, source_desktop: str, new_name: str) -> dict:
 def _revert(desktop_id: str, key: str) -> None:
     state = load_state()
     record = state.get(desktop_id)
-    field = 'icon_path' if key == 'Icon' else 'custom_name'
+    if key == 'Icon':
+        field = 'icon_path' if (record and record.get('icon_path')) else 'theme_icon'
+    elif key == 'Name':
+        field = 'custom_name'
+    elif key == 'Exec':
+        field = 'custom_command'
+    else:
+        raise OverrideError(f'Unknown override key: {key}')
+
     if not record or not record.get(field):
         raise OverrideError(f'No custom {key.lower()} override for this app.')
     local, text, record = _prepare(state, desktop_id, record['local_desktop'])
-    saved = record.get('original_' + key.lower() + '_lines')
+    saved_key = 'exec' if key == 'Exec' else key.lower()
+    saved = record.get('original_' + saved_key + '_lines')
     if saved is None:
-        # Older Glyph state did not retain translations. Recover them from its
-        # recorded stock source only when Glyph originally created the override.
         source = Path(record.get('source_path', ''))
         if record.get('created_local') and source != local and source.is_file():
             saved = _snapshot_lines(_read(source, MAX_DESKTOP_BYTES).decode('utf-8'), key)
         else:
-            value = record.get('original_' + key.lower(), '')
+            value = record.get('original_' + saved_key, '')
             saved = [f'{key}={_escape(value)}\n'] if value else []
     text = _replace_lines(text, key, saved)
     writes = {local: text.encode()}
     asset = record.get('icon_path') if key == 'Icon' else None
-    for name in (field, 'original_' + key.lower(), 'original_' + key.lower() + '_lines'):
+    asset_hash = record.get('icon_hash') if key == 'Icon' else None
+    fields_to_pop = [field, 'original_' + saved_key, 'original_' + saved_key + '_lines']
+    if key == 'Icon':
+        fields_to_pop.extend(['icon_path', 'icon_hash', 'theme_icon'])
+    for name in fields_to_pop:
         record.pop(name, None)
-    if not record.get('icon_path') and not record.get('custom_name'):
-        # Remove only an unchanged Glyph-created copy. Compare key order
-        # independently, since key replacement can reposition Name and Icon.
+    has_overrides = bool(record.get('icon_path') or record.get('theme_icon') or record.get('custom_name') or record.get('custom_command'))
+    if not has_overrides and not record.get('glyph_managed_appimage'):
         if record.get('created_local'):
             original = record.get('original_text')
             if original is None:
@@ -495,7 +589,8 @@ def _revert(desktop_id: str, key: str) -> None:
                         original = None
             if original is not None:
                 def normalized(value):
-                    return _replace_lines(_replace_lines(value, 'Icon', []), 'Name', []), _snapshot_lines(value, 'Icon'), _snapshot_lines(value, 'Name')
+                    v = _replace_lines(_replace_lines(_replace_lines(value, 'Icon', []), 'Name', []), 'Exec', [])
+                    return v, _snapshot_lines(value, 'Icon'), _snapshot_lines(value, 'Name'), _snapshot_lines(value, 'Exec')
                 if normalized(text) == normalized(original):
                     writes[local] = None
         del state[desktop_id]
@@ -503,7 +598,13 @@ def _revert(desktop_id: str, key: str) -> None:
         record['last_hash'] = _digest(text.encode())
         state[desktop_id] = record
     if asset and not any(r.get('icon_path') == asset for r in state.values()):
-        writes[Path(asset)] = None
+        asset_path = Path(asset)
+        if asset_hash and asset_path.is_file():
+            try:
+                if hashlib.sha256(asset_path.read_bytes()).hexdigest() == asset_hash:
+                    writes[asset_path] = None
+            except OSError:
+                pass
     _commit(state, writes)
     refresh_desktop_database()
 
@@ -519,21 +620,50 @@ def revert_name(desktop_id: str) -> None:
 
 
 @operation
+def revert_command(desktop_id: str) -> None:
+    _revert(desktop_id, 'Exec')
+
+
+@operation
 def restore_stock_launcher(desktop_id: str) -> None:
     _id(desktop_id)
     if not find_stock(desktop_id):
         raise OverrideError('No stock launcher exists. This local-only application was left unchanged.')
     state = load_state()
-    # Remove all local paths with this ID, including an ambiguous nested/flat pair.
-    paths = [p for p in APPLICATIONS_DIR.rglob('*.desktop')
-             if '-'.join(p.relative_to(APPLICATIONS_DIR).parts) == desktop_id and p.is_file()]
-    if not paths:
+    record = state.get(desktop_id)
+    if not record:
+        raise OverrideError('Glyph has no recorded override for this launcher; it was left unchanged.')
+    local = Path(record.get('local_desktop', ''))
+    _confined(local, APPLICATIONS_DIR)
+    if '-'.join(local.relative_to(APPLICATIONS_DIR).parts) != desktop_id:
+        raise OverrideError('The recorded launcher path does not match this application; it was left unchanged.')
+    if not local.is_file():
         raise OverrideError('No local launcher override exists.')
-    writes = {_confined(p, APPLICATIONS_DIR): None for p in paths}
-    record = state.pop(desktop_id, {})
+
+    if not record.get('created_local'):
+        raise OverrideError(
+            'This user launcher existed before Glyph and was left in place. '
+            'Use the name, icon, and command reset controls to undo Glyph’s changes.')
+
+    current = _read(local, MAX_DESKTOP_BYTES)
+    expected_hash = record.get('last_hash', '')
+    if not expected_hash or _digest(current) != expected_hash:
+        raise OverrideError(
+            'The local launcher is not the unchanged copy recorded by Glyph. '
+            'It was left in place to preserve your changes.')
+
+    writes: dict[Path, bytes | None] = {local: None}
+    record = state.pop(desktop_id)
     asset = record.get('icon_path')
+    asset_hash = record.get('icon_hash')
     if asset and not any(r.get('icon_path') == asset for r in state.values()):
-        writes[Path(asset)] = None
+        asset_path = Path(asset)
+        if asset_hash and asset_path.is_file():
+            try:
+                if hashlib.sha256(asset_path.read_bytes()).hexdigest() == asset_hash:
+                    writes[asset_path] = None
+            except OSError:
+                pass
     _commit(state, writes)
     refresh_desktop_database()
 

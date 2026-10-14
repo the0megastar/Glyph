@@ -8,7 +8,18 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from glyph.paths import data_home, desktop_index, find_stock, host_data_home, in_flatpak, stock_dirs, user_application_dirs
+from glyph.paths import (
+    data_home,
+    desktop_index,
+    find_stock,
+    host_applications_dir,
+    host_data_home,
+    host_user_home,
+    in_flatpak,
+    local_applications_dir,
+    stock_dirs,
+    user_application_dirs,
+)
 
 
 class TestPaths(unittest.TestCase):
@@ -16,7 +27,8 @@ class TestPaths(unittest.TestCase):
         # Fresh import verifies the real module-level destinations, not patched ones.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            env = dict(os.environ, HOME=tmp, XDG_DATA_HOME=str(root / 'private'),
+            private = root / 'private'
+            env = dict(os.environ, HOME=tmp, XDG_DATA_HOME=str(private),
                        HOST_XDG_DATA_HOME=str(root / 'host'), XDG_DATA_DIRS=str(root / 'shared'),
                        PYTHONPATH=str(Path(__file__).resolve().parent.parent / 'src'))
             result = subprocess.run([sys.executable, '-B', '-c', '''
@@ -26,12 +38,13 @@ from glyph import paths
 with patch.object(paths, 'in_flatpak', return_value=True):
     from glyph import overrides as ov
     from glyph import catalog
-    host = paths.host_data_home() / 'applications'
-    host.mkdir(parents=True)
-    launcher = host / 'demo.desktop'
+    # In Flatpak, the host applications directory is mounted at $XDG_DATA_HOME/applications
+    apps_dir = paths.data_home() / 'applications'
+    apps_dir.mkdir(parents=True)
+    launcher = apps_dir / 'demo.desktop'
     original = '[Desktop Entry]\\nType=Application\\nName=Original\\nExec=/bin/true\\n'
     launcher.write_text(original)
-    assert ov.APPLICATIONS_DIR == host
+    assert ov.APPLICATIONS_DIR == apps_dir
     with patch.object(ov, 'refresh_desktop_database'):
         ov.apply_name('demo.desktop', str(launcher), 'Changed')
         assert 'Name=Changed' in launcher.read_text()
@@ -39,7 +52,6 @@ with patch.object(paths, 'in_flatpak', return_value=True):
         assert apps['demo.desktop'].name == 'Changed'
         ov.revert_name('demo.desktop')
     assert sorted(launcher.read_text().splitlines()) == sorted(original.splitlines())
-    assert not (paths.data_home() / 'applications/demo.desktop').exists()
 '''], env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
 
@@ -48,14 +60,14 @@ with patch.object(paths, 'in_flatpak', return_value=True):
             home = Path(tmp)
             host = home / 'custom-data'
             private = home / '.var/app/glyph/data'
-            export = host / 'flatpak/exports/share/applications'
+            export = private / 'flatpak/exports/share/applications'
             export.mkdir(parents=True)
             (export / 'demo.desktop').write_text('[Desktop Entry]\nName=Demo\n')
             with patch('glyph.paths.in_flatpak', return_value=True), patch.object(
                     Path, 'home', return_value=home), patch.dict(os.environ, {
                         'XDG_DATA_HOME': str(private), 'HOST_XDG_DATA_HOME': str(host),
                         'XDG_DATA_DIRS': '/app/share:/usr/share'}):
-                self.assertEqual(user_application_dirs(), [host / 'applications'])
+                self.assertEqual(user_application_dirs(), [private / 'applications'])
                 self.assertEqual(desktop_index(stock_dirs())['demo.desktop'], export / 'demo.desktop')
                 for value in ('', 'relative'):
                     with patch.dict(os.environ, {'HOST_XDG_DATA_HOME': value}):
@@ -164,6 +176,75 @@ with patch.object(paths, 'in_flatpak', return_value=True):
             self.assertEqual(find_stock("app.desktop", index=custom_index), str(launcher))
             self.assertEqual(find_stock("missing.desktop", index=custom_index), "")
 
+    def test_host_user_home_native(self):
+        with patch("glyph.paths.in_flatpak", return_value=False):
+            self.assertEqual(host_user_home(), Path.home())
+
+    def test_host_user_home_flatpak_via_env(self):
+        with patch("glyph.paths.in_flatpak", return_value=True), patch.dict(
+            os.environ, {"HOST_XDG_DATA_HOME": "/home/testuser/.local/share"}
+        ):
+            self.assertEqual(host_user_home(), Path("/home/testuser"))
+
+    def test_host_user_home_flatpak_via_spawn(self):
+        with patch("glyph.paths.in_flatpak", return_value=True), patch.dict(
+            os.environ, {"HOST_XDG_DATA_HOME": ""}
+        ), patch("glyph.paths.shutil.which", return_value="/usr/bin/flatpak-spawn"), patch(
+            "glyph.paths.subprocess.run",
+            return_value=unittest.mock.MagicMock(returncode=0, stdout="/home/spawnuser\n"),
+        ) as mock_run_fn:
+            self.assertEqual(host_user_home(), Path("/home/spawnuser"))
+            self.assertEqual(
+                mock_run_fn.call_args[0][0],
+                ["/usr/bin/flatpak-spawn", "--host", "printenv", "HOME"],
+            )
+
+    def test_applications_dirs(self):
+        with patch("glyph.paths.host_user_home", return_value=Path("/home/custom")):
+            self.assertEqual(host_applications_dir(), Path("/home/custom/Applications"))
+        self.assertEqual(local_applications_dir(), Path.home() / "Applications")
+
+    def test_flatpak_icon_dirs_includes_host_xdg_and_icons(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            host_dh = home / "host_local_share"
+            host_icons = host_dh / "icons"
+            host_icons.mkdir(parents=True)
+            with patch("glyph.paths.in_flatpak", return_value=True), \
+                 patch("glyph.paths.host_data_home", return_value=host_dh), \
+                 patch("glyph.paths.host_user_home", return_value=home), \
+                 patch.object(Path, "home", return_value=home):
+                from glyph.paths import icon_dirs
+                dirs = icon_dirs()
+                self.assertIn(host_icons, dirs)
+                self.assertIn(home / ".icons", dirs)
+
+    def test_native_icon_dirs_preserves_standard_roots(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            with patch("glyph.paths.in_flatpak", return_value=False), \
+                 patch.object(Path, "home", return_value=home):
+                from glyph.paths import icon_dirs, data_home
+                dirs = icon_dirs()
+                self.assertIn(data_home() / "icons", dirs)
+                self.assertIn(data_home() / "pixmaps", dirs)
+                self.assertNotIn(home / ".icons", dirs)
+
+    def test_manifest_permissions_review(self):
+        manifest_path = Path(__file__).resolve().parent.parent / "io.github.the0megastar.Glyph.yaml"
+        self.assertTrue(manifest_path.is_file())
+        content = manifest_path.read_text(encoding="utf-8")
+        import yaml
+        manifest = yaml.safe_load(content)
+        finish_args = manifest.get("finish-args", [])
+        self.assertIn("--filesystem=xdg-data/icons:ro", finish_args)
+        self.assertIn("--filesystem=~/.icons:ro", finish_args)
+        # Ensure no write access is granted to icon folders
+        for arg in finish_args:
+            if "icons" in arg:
+                self.assertTrue(arg.endswith(":ro"), f"Icon mount must be strictly read-only: {arg}")
+
 
 if __name__ == "__main__":
     unittest.main()
+

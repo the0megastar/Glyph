@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import shutil
+import subprocess
 
 
 def data_home() -> Path:
@@ -20,6 +22,43 @@ def host_data_home() -> Path:
         return data_home()
     value = os.environ.get("HOST_XDG_DATA_HOME", "")
     return Path(value) if value and Path(value).is_absolute() else Path.home() / ".local/share"
+
+
+def host_user_home() -> Path:
+    """The desktop user's host home directory across environments."""
+    if not in_flatpak():
+        return Path.home()
+    value = os.environ.get("HOST_XDG_DATA_HOME", "")
+    if value and Path(value).is_absolute():
+        parts = Path(value).resolve().parts
+        if ".local" in parts:
+            idx = parts.index(".local")
+            return Path(*parts[:idx])
+        return Path(value).parent.parent
+    spawn = shutil.which("flatpak-spawn")
+    if spawn:
+        try:
+            res = subprocess.run(
+                [spawn, "--host", "printenv", "HOME"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                return Path(res.stdout.strip())
+        except Exception:
+            pass
+    return Path.home()
+
+
+def host_applications_dir() -> Path:
+    """The user's ~/Applications directory on the host desktop (for host-side Exec targets)."""
+    return host_user_home() / "Applications"
+
+
+def local_applications_dir() -> Path:
+    """The writable ~/Applications directory accessible to the running process."""
+    return Path.home() / "Applications"
 
 
 def _xdg_data_roots() -> list[Path]:
@@ -42,7 +81,7 @@ def shared_data_roots() -> list[Path]:
         ]
     roots.extend(
         [
-            host_data_home() / "flatpak/exports/share",
+            data_home() / "flatpak/exports/share",
             Path("/var/lib/flatpak/exports/share"),
             Path("/var/lib/snapd/desktop"),
         ]
@@ -52,7 +91,7 @@ def shared_data_roots() -> list[Path]:
 
 def user_application_dirs() -> list[Path]:
     """Return writable/local launcher roots, highest precedence first."""
-    return [host_data_home() / "applications"]
+    return [data_home() / "applications"]
 
 
 def stock_dirs() -> list[Path]:
@@ -68,10 +107,56 @@ def application_dirs() -> list[Path]:
 def icon_dirs() -> list[Path]:
     """Return icon search roots matching the launcher discovery sources."""
     roots = [data_home(), *shared_data_roots()]
-    result: list[Path] = []
+    candidates: list[Path] = []
+    if in_flatpak():
+        # Read-only host user themes: $XDG_DATA_HOME/icons, host ~/.icons, and sandbox ~/.icons
+        candidates.extend([
+            host_data_home() / "icons",
+            host_user_home() / ".icons",
+            Path.home() / ".icons",
+        ])
     for root in roots:
-        result.extend((root / "icons", root / "pixmaps"))
-    return list(dict.fromkeys(result))
+        candidates.extend((root / "icons", root / "pixmaps"))
+
+    allowed_boundaries: list[Path] = []
+    if in_flatpak():
+        allowed_boundaries.extend([
+            host_data_home(),
+            host_user_home() / ".icons",
+            Path.home() / ".icons",
+        ])
+    for root in roots:
+        allowed_boundaries.append(root)
+
+    resolved_boundaries: list[Path] = []
+    for b in allowed_boundaries:
+        try:
+            resolved_boundaries.append(b.resolve())
+        except (OSError, RuntimeError):
+            resolved_boundaries.append(b)
+
+    deduped: list[Path] = []
+    seen: set[Path] = set()
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+        except (OSError, RuntimeError):
+            resolved = candidate
+
+        # If candidate is a symlink, avoid following outside allowed boundaries
+        if candidate.is_symlink():
+            is_inside = any(
+                str(resolved).startswith(str(boundary) + "/") or resolved == boundary
+                for boundary in resolved_boundaries
+            )
+            if not is_inside:
+                continue
+
+        if resolved not in seen:
+            seen.add(resolved)
+            deduped.append(candidate)
+
+    return deduped
 
 
 def configure_xdg_data_dirs() -> None:

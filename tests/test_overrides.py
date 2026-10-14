@@ -147,14 +147,10 @@ class TestOverrides(unittest.TestCase):
             encoding="utf-8",
         )
         shadow_launcher = self.app_dir / "stock-app.desktop"
-        shadow_launcher.write_text(
-            "[Desktop Entry]\nName=Stock App\nIcon=stock-icon\nType=Application\n",
-            encoding="utf-8",
-        )
-        apply_icon("stock-app.desktop", str(shadow_launcher), str(self.sample_png))
-        shadow_icon = Path(load_state()["stock-app.desktop"]["icon_path"])
-
         with patch("glyph.overrides.find_stock", side_effect=lambda did: str(stock_file) if did == "stock-app.desktop" else ""):
+            apply_icon("stock-app.desktop", str(stock_file), str(self.sample_png))
+            shadow_icon = Path(load_state()["stock-app.desktop"]["icon_path"])
+
             res = restore_all_to_stock()
             self.assertEqual(res.completed, 1)
 
