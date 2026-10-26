@@ -1051,6 +1051,151 @@ class TestOverrides(unittest.TestCase):
             restore_all_to_stock(delete_icon=True)
             self.assertFalse(icon_s2.exists())
 
+    def test_revert_all_icons_includes_theme_icons_and_respects_delete_choice(self):
+        p_img = self.app_dir / "app_img.desktop"
+        p_img.write_text("[Desktop Entry]\nType=Application\nName=ImgApp\nIcon=orig-img-icon\n", encoding="utf-8")
+        apply_icon("app_img.desktop", str(p_img), str(self.sample_png))
+        icon_path = Path(load_state()["app_img.desktop"]["icon_path"])
+
+        p_theme = self.app_dir / "app_theme.desktop"
+        p_theme.write_text("[Desktop Entry]\nType=Application\nName=ThemeApp\nIcon=orig-theme-icon\n", encoding="utf-8")
+        apply_theme_icon("app_theme.desktop", str(p_theme), "custom-theme-icon")
+
+        # Confirm both are in state
+        state = load_state()
+        self.assertIn("app_img.desktop", state)
+        self.assertIn("app_theme.desktop", state)
+
+        # 1. Revert all with delete_icon=False: both return to original, image preserved
+        res_keep = revert_all_icons(delete_icon=False)
+        self.assertEqual(res_keep.completed, 2)
+        self.assertEqual(len(res_keep.errors), 0)
+        self.assertIn("Icon=orig-img-icon", p_img.read_text(encoding="utf-8"))
+        self.assertIn("Icon=orig-theme-icon", p_theme.read_text(encoding="utf-8"))
+        self.assertTrue(icon_path.exists())
+
+        # 2. Re-apply both and revert all with delete_icon=True: image deleted, theme icon resets cleanly
+        apply_icon("app_img.desktop", str(p_img), str(self.sample_png))
+        icon_path_new = Path(load_state()["app_img.desktop"]["icon_path"])
+        apply_theme_icon("app_theme.desktop", str(p_theme), "custom-theme-icon-2")
+
+        res_del = revert_all_icons(delete_icon=True)
+        self.assertEqual(res_del.completed, 2)
+        self.assertEqual(len(res_del.errors), 0)
+        self.assertIn("Icon=orig-img-icon", p_img.read_text(encoding="utf-8"))
+        self.assertIn("Icon=orig-theme-icon", p_theme.read_text(encoding="utf-8"))
+        self.assertFalse(icon_path_new.exists())
+
+    def test_reset_glyph_created_launcher_preserves_external_unrelated_content(self):
+        # Case 1: Glyph creates local copy, external edit adds unrelated key, reset preserves local file
+        stock_file = self.stock_dir / "stock_reset.desktop"
+        stock_file.write_text(
+            "[Desktop Entry]\nType=Application\nName=StockReset\nExec=stock-exec\nIcon=stock-icon\n",
+            encoding="utf-8"
+        )
+        local_file = self.app_dir / "stock_reset.desktop"
+        self.assertFalse(local_file.exists())
+
+        with patch("glyph.overrides.find_stock", return_value=str(stock_file)):
+            # Glyph creates local launcher
+            apply_icon("stock_reset.desktop", str(stock_file), str(self.sample_png))
+            self.assertTrue(local_file.exists())
+            self.assertTrue(load_state()["stock_reset.desktop"]["created_local"])
+
+            # Externally edit the local copy: change Name and add unrelated key
+            icon_p = load_state()["stock_reset.desktop"]["icon_path"]
+            local_file.write_text(
+                f"[Desktop Entry]\nType=Application\nName=ExternalName\nExec=stock-exec\nIcon={icon_p}\nX-Vendor-Extra=Survives\n",
+                encoding="utf-8"
+            )
+
+            # Accept overwrite on subsequent edit (e.g. rename)
+            apply_name("stock_reset.desktop", str(local_file), "Glyph Custom Name", force=True)
+            self.assertIn("X-Vendor-Extra=Survives", local_file.read_text(encoding="utf-8"))
+
+            # Reset all Glyph overrides
+            revert_icon("stock_reset.desktop")
+            revert_name("stock_reset.desktop")
+
+            # Since the local file has external edits (Name=ExternalName, X-Vendor-Extra=Survives),
+            # it must NOT be deleted!
+            self.assertTrue(local_file.exists(), "Local launcher with external edits must survive reset")
+            text = local_file.read_text(encoding="utf-8")
+            self.assertIn("X-Vendor-Extra=Survives", text)
+            self.assertIn("Name=ExternalName", text)
+            self.assertIn("Icon=stock-icon", text)
+            self.assertNotIn("stock_reset.desktop", load_state())
+
+        # Case 2: Without unrelated external edits, reset all overrides removes generated duplicate
+        stock_clean = self.stock_dir / "stock_clean.desktop"
+        stock_clean.write_text(
+            "[Desktop Entry]\nType=Application\nName=StockClean\nExec=stock-exec\nIcon=stock-icon\n",
+            encoding="utf-8"
+        )
+        local_clean = self.app_dir / "stock_clean.desktop"
+        with patch("glyph.overrides.find_stock", return_value=str(stock_clean)):
+            apply_name("stock_clean.desktop", str(stock_clean), "Glyph Clean")
+            self.assertTrue(local_clean.exists())
+            self.assertTrue(load_state()["stock_clean.desktop"]["created_local"])
+
+            revert_name("stock_clean.desktop")
+            self.assertFalse(local_clean.exists(), "Generated duplicate matching stock must be deleted on reset")
+
+        # Case 3: Pre-existing user launcher is never deleted
+        local_user = self.app_dir / "user_existing.desktop"
+        local_user.write_text(
+            "[Desktop Entry]\nType=Application\nName=UserPre\nExec=user-exec\nIcon=user-icon\n",
+            encoding="utf-8"
+        )
+        apply_name("user_existing.desktop", str(local_user), "Glyph User Pre")
+        self.assertFalse(load_state()["user_existing.desktop"]["created_local"])
+        revert_name("user_existing.desktop")
+        self.assertTrue(local_user.exists(), "Pre-existing user launcher must never be deleted")
+
+    def test_discard_override_unreadable_and_missing_artwork(self):
+        # 1. Unreadable icon file
+        p_unread = self.app_dir / "unread_art.desktop"
+        p_unread.write_text("[Desktop Entry]\nType=Application\nName=UnreadArt\nIcon=orig-unread\n", encoding="utf-8")
+        apply_icon("unread_art.desktop", str(p_unread), str(self.sample_png))
+        icon_unread = Path(load_state()["unread_art.desktop"]["icon_path"])
+
+        orig_read_bytes = Path.read_bytes
+        def mock_read_bytes(*args, **kwargs):
+            raise PermissionError("Simulated unreadable icon")
+
+        with patch.object(Path, "read_bytes", side_effect=mock_read_bytes):
+            res_unread = discard_override("unread_art.desktop", delete_icon=True)
+            self.assertTrue(res_unread["icon_skipped"])
+            self.assertEqual(res_unread["icon_skip_reason"], "unreadable")
+            self.assertFalse(res_unread["icon_deleted"])
+            self.assertFalse(res_unread["icon_kept"])
+            self.assertTrue(icon_unread.exists(), "Unreadable icon must remain on disk")
+            self.assertNotIn("unread_art.desktop", load_state())
+
+        # 2. Missing icon file does not report icon_skipped
+        p_missing = self.app_dir / "missing_art.desktop"
+        p_missing.write_text("[Desktop Entry]\nType=Application\nName=MissingArt\nIcon=orig-miss\n", encoding="utf-8")
+        apply_icon("missing_art.desktop", str(p_missing), str(self.sample_png))
+        icon_missing = Path(load_state()["missing_art.desktop"]["icon_path"])
+        icon_missing.unlink()
+
+        res_miss = discard_override("missing_art.desktop", delete_icon=True)
+        self.assertFalse(res_miss["icon_skipped"])
+        self.assertFalse(res_miss["icon_deleted"])
+        self.assertNotIn("missing_art.desktop", load_state())
+
+        # 3. User keep choice (delete_icon=False)
+        p_keep = self.app_dir / "keep_choice.desktop"
+        p_keep.write_text("[Desktop Entry]\nType=Application\nName=KeepArt\nIcon=orig-keep\n", encoding="utf-8")
+        apply_icon("keep_choice.desktop", str(p_keep), str(self.sample_png))
+        icon_keep = Path(load_state()["keep_choice.desktop"]["icon_path"])
+
+        res_keep = discard_override("keep_choice.desktop", delete_icon=False)
+        self.assertTrue(res_keep["icon_kept"])
+        self.assertFalse(res_keep["icon_skipped"])
+        self.assertFalse(res_keep["icon_deleted"])
+        self.assertTrue(icon_keep.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

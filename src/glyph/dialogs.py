@@ -66,7 +66,10 @@ def handle_discard(parent: Gtk.Widget | None, desktop_id: str, app_name: str) ->
             res = discard_override(desktop_id, delete_icon=delete_icon)
             _reload(parent)
             if res and res.get("icon_skipped"):
-                _toast(parent, f"Discarded overrides for {app_name}. Custom artwork was preserved.")
+                if res.get("icon_skip_reason") == "modified":
+                    _toast(parent, f"Discarded overrides for {app_name}. Modified artwork was preserved.")
+                else:
+                    _toast(parent, f"Discarded overrides for {app_name}. Custom artwork was preserved.")
             else:
                 _toast(parent, f"Discarded overrides for {app_name}.")
         except OverrideError as exc:
@@ -250,9 +253,25 @@ def confirm_restore_all_stock(parent: Gtk.Widget | None) -> None:
         return
 
     from glyph.paths import desktop_index, find_stock
-    from glyph.overrides import APPLICATIONS_DIR
+    from glyph.overrides import APPLICATIONS_DIR, _confined
     stock_ids = [k for k in desktop_index([APPLICATIONS_DIR]) if find_stock(k)]
-    eligible_count = sum(1 for k in stock_ids if can_delete_managed_icon(k, state))
+    eligible_count = 0
+    for k in stock_ids:
+        rec = state.get(k)
+        if not rec or not rec.get("created_local"):
+            continue
+        local_str = rec.get("local_desktop", "")
+        if not local_str:
+            continue
+        local = Path(local_str)
+        try:
+            _confined(local, APPLICATIONS_DIR)
+            if "-".join(local.relative_to(APPLICATIONS_DIR).parts) != k or not local.is_file():
+                continue
+        except Exception:
+            continue
+        if can_delete_managed_icon(k, state):
+            eligible_count += 1
 
     def do_restore(delete_icon: bool = False):
         try:

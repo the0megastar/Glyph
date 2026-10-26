@@ -1016,7 +1016,10 @@ class GlyphWindow(Adw.ApplicationWindow):
                 return
             self.reload()
             if res and res.get("icon_skipped"):
-                self._toast(f"Discarded overrides for {app.name}. Custom artwork was preserved.")
+                if res.get("icon_skip_reason") == "modified":
+                    self._toast(f"Discarded overrides for {app.name}. Modified artwork was preserved.")
+                else:
+                    self._toast(f"Discarded overrides for {app.name}. Custom artwork was preserved.")
             else:
                 self._toast(f"Discarded overrides for {app.name}.")
 

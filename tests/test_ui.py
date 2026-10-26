@@ -577,12 +577,22 @@ class TestUI(unittest.TestCase):
 
     def test_confirm_restore_all_stock_artwork_prompt(self):
         parent = MagicMock()
-        state = {"stock.desktop": {"icon_path": "/path/stock.png"}}
+        self.app_dir.mkdir(parents=True, exist_ok=True)
+        local_path = self.app_dir / "stock.desktop"
+        local_path.write_text("[Desktop Entry]\nType=Application\nName=Stock\n", encoding="utf-8")
+        state = {
+            "stock.desktop": {
+                "icon_path": "/path/stock.png",
+                "created_local": True,
+                "local_desktop": str(local_path),
+            }
+        }
 
         # Case 1: eligible_count > 0 -> prompts keep/delete artwork
         with patch("glyph.dialogs.load_state", return_value=state), \
-             patch("glyph.paths.desktop_index", return_value={"stock.desktop": Path("/path")}), \
+             patch("glyph.paths.desktop_index", return_value={"stock.desktop": local_path}), \
              patch("glyph.paths.find_stock", return_value="/stock/path"), \
+             patch("glyph.overrides.APPLICATIONS_DIR", self.app_dir), \
              patch("glyph.dialogs.can_delete_managed_icon", return_value=True), \
              patch("glyph.dialogs.prompt_artwork_cleanup") as mock_prompt, \
              patch("glyph.dialogs.restore_all_to_stock") as mock_restore:
@@ -596,8 +606,9 @@ class TestUI(unittest.TestCase):
         # Case 2: eligible_count == 0 -> standard dialog
         alert = MagicMock()
         with patch("glyph.dialogs.load_state", return_value=state), \
-             patch("glyph.paths.desktop_index", return_value={"stock.desktop": Path("/path")}), \
+             patch("glyph.paths.desktop_index", return_value={"stock.desktop": local_path}), \
              patch("glyph.paths.find_stock", return_value="/stock/path"), \
+             patch("glyph.overrides.APPLICATIONS_DIR", self.app_dir), \
              patch("glyph.dialogs.can_delete_managed_icon", return_value=False), \
              patch.object(dialogs.Adw, "AlertDialog", return_value=alert), \
              patch("glyph.dialogs.restore_all_to_stock") as mock_restore:
@@ -704,6 +715,94 @@ class TestUI(unittest.TestCase):
             cb = alert_instance.connect.call_args.args[1]
             cb(alert_instance, "unregister")
             self.assertEqual(toasts[-1], "Unregistered launcher for Toast App. Binary file preserved.")
+
+    def test_confirm_revert_all_icons_with_theme_icon_and_image(self):
+        parent = MagicMock()
+        state = {
+            "app_img.desktop": {"icon_path": "/path/1.png"},
+            "app_theme.desktop": {"theme_icon": "custom-theme"},
+        }
+
+        with patch("glyph.dialogs.load_state", return_value=state), \
+             patch("glyph.dialogs.can_delete_managed_icon", side_effect=lambda k, s: k == "app_img.desktop"), \
+             patch("glyph.dialogs.prompt_artwork_cleanup") as mock_prompt, \
+             patch("glyph.dialogs.revert_all_icons", return_value=ov.BatchResult(completed=2)) as mock_revert:
+            dialogs.confirm_revert_all_icons(parent)
+            mock_prompt.assert_called_once()
+            kwargs = mock_prompt.call_args.kwargs
+            # Body should mention 2 applications and 1 saved custom image
+            self.assertIn("2 applications", kwargs["body"])
+            self.assertIn("1 saved custom image", kwargs["body"])
+
+            on_choice = kwargs["on_choice"]
+            on_choice(delete_icon=True)
+            mock_revert.assert_called_once_with(delete_icon=True)
+            parent._toast.assert_called_once_with("Restored original icons for 2 applications.")
+
+    def test_confirm_restore_all_stock_counts_only_glyph_created_launchers(self):
+        parent = MagicMock()
+        self.app_dir.mkdir(parents=True, exist_ok=True)
+        glyph_local = self.app_dir / "glyph_app.desktop"
+        glyph_local.write_text("[Desktop Entry]\nType=Application\nName=GlyphApp\n", encoding="utf-8")
+        user_local = self.app_dir / "user_app.desktop"
+        user_local.write_text("[Desktop Entry]\nType=Application\nName=UserApp\n", encoding="utf-8")
+
+        state = {
+            "glyph_app.desktop": {
+                "icon_path": "/path/img1.png",
+                "created_local": True,
+                "local_desktop": str(glyph_local),
+            },
+            "user_app.desktop": {
+                "icon_path": "/path/img2.png",
+                "created_local": False,
+                "local_desktop": str(user_local),
+            },
+        }
+
+        with patch("glyph.dialogs.load_state", return_value=state), \
+             patch("glyph.paths.desktop_index", return_value={"glyph_app.desktop": glyph_local, "user_app.desktop": user_local}), \
+             patch("glyph.paths.find_stock", return_value="/stock/path"), \
+             patch("glyph.overrides.APPLICATIONS_DIR", self.app_dir), \
+             patch("glyph.dialogs.can_delete_managed_icon", return_value=True), \
+             patch("glyph.dialogs.prompt_artwork_cleanup") as mock_prompt, \
+             patch("glyph.dialogs.restore_all_to_stock", return_value=ov.BatchResult(completed=1, errors=[("user_app.desktop", "Pre-existing")])) as mock_restore:
+            dialogs.confirm_restore_all_stock(parent)
+            mock_prompt.assert_called_once()
+            kwargs = mock_prompt.call_args.kwargs
+            # Only the Glyph-created launcher should be counted in artwork cleanup
+            self.assertIn("1 saved custom image", kwargs["body"])
+
+            on_choice = kwargs["on_choice"]
+            on_choice(delete_icon=True)
+            mock_restore.assert_called_once_with(delete_icon=True)
+            parent._toast.assert_called_once_with("Restored 1 launcher to system default. (1 failed)")
+
+    def test_discard_override_toast_messages(self):
+        app = SimpleNamespace(name="Discard App", desktop_id="discard.desktop")
+        toasts = []
+        win_stub = SimpleNamespace(
+            _toast=lambda msg: toasts.append(msg),
+            reload=MagicMock(),
+        )
+
+        # 1. Modified artwork preserved
+        with patch("glyph.window.can_delete_managed_icon", return_value=False), \
+             patch("glyph.window.discard_override", return_value={"icon_skipped": True, "icon_skip_reason": "modified"}):
+            window.GlyphWindow._discard_overrides(win_stub, app)
+            self.assertEqual(toasts[-1], "Discarded overrides for Discard App. Modified artwork was preserved.")
+
+        # 2. General custom artwork preserved (e.g. unreadable, shared)
+        with patch("glyph.window.can_delete_managed_icon", return_value=False), \
+             patch("glyph.window.discard_override", return_value={"icon_skipped": True, "icon_skip_reason": "unreadable"}):
+            window.GlyphWindow._discard_overrides(win_stub, app)
+            self.assertEqual(toasts[-1], "Discarded overrides for Discard App. Custom artwork was preserved.")
+
+        # 3. Clean discard (icon deleted or no icon)
+        with patch("glyph.window.can_delete_managed_icon", return_value=False), \
+             patch("glyph.window.discard_override", return_value={"icon_deleted": True, "icon_skipped": False}):
+            window.GlyphWindow._discard_overrides(win_stub, app)
+            self.assertEqual(toasts[-1], "Discarded overrides for Discard App.")
 
 
 if __name__ == "__main__":
