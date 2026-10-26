@@ -18,11 +18,14 @@ import glyph.launcher as launcher
 from glyph.paths import in_flatpak
 import glyph.sources as sources
 from glyph.overrides import (
+    LauncherModifiedExternallyError,
     OverrideError,
     apply_command,
     apply_icon,
     apply_name,
     apply_theme_icon,
+    can_delete_managed_icon,
+    discard_override,
     load_state,
     restore_stock_launcher,
     revert_command,
@@ -870,13 +873,26 @@ class GlyphWindow(Adw.ApplicationWindow):
                 if not source_desktop:
                     self._toast("No desktop file found to override.")
                     return
-                try:
-                    apply_name(app.desktop_id, source_desktop, new_name)
-                except OverrideError as exc:
-                    self._toast(str(exc))
-                    return
-                self.reload()
-                self._toast("Display name saved.")
+
+                def do_save_name(name: str, force: bool = False):
+                    try:
+                        apply_name(app.desktop_id, source_desktop, name, force=force)
+                    except LauncherModifiedExternallyError:
+                        dialogs.prompt_external_modification(
+                            self,
+                            app.name,
+                            allow_overwrite=True,
+                            on_overwrite=lambda: do_save_name(name, force=True),
+                            on_discard=lambda: self._discard_overrides(app),
+                        )
+                        return
+                    except OverrideError as exc:
+                        self._toast(str(exc))
+                        return
+                    self.reload()
+                    self._toast("Display name saved.")
+
+                do_save_name(new_name, force=False)
 
         dialog.connect("response", on_response)
         dialog.present(self)
@@ -884,21 +900,40 @@ class GlyphWindow(Adw.ApplicationWindow):
     def _on_name_reset(self, _button: Gtk.Button) -> None:
         if not self._detail_id:
             return
+        app = self._find(self._detail_id) if hasattr(self, "_find") else None
         try:
             revert_name(self._detail_id)
+        except LauncherModifiedExternallyError:
+            app_name = app.name if app else "application"
+            dialogs.prompt_external_modification(
+                self,
+                app_name,
+                allow_overwrite=False,
+                on_discard=lambda: self._discard_overrides(app),
+            )
+            return
         except OverrideError as exc:
             self._toast(str(exc))
             return
         self.reload()
         self._toast("Original display name restored.")
 
-    def _apply_icon_path(self, app: AppEntry, path: str) -> bool:
+    def _apply_icon_path(self, app: AppEntry, path: str, *, force: bool = False, delete_icon: bool = False) -> bool:
         source_desktop = app.filename or app.stock_filename
         if not source_desktop:
             self._toast("No desktop file found to override.")
             return False
         try:
-            apply_icon(app.desktop_id, source_desktop, path)
+            apply_icon(app.desktop_id, source_desktop, path, force=force, delete_icon=delete_icon)
+        except LauncherModifiedExternallyError:
+            dialogs.prompt_external_modification(
+                self,
+                app.name,
+                allow_overwrite=True,
+                on_overwrite=lambda: self._apply_icon_path(app, path, force=True, delete_icon=delete_icon),
+                on_discard=lambda: self._discard_overrides(app),
+            )
+            return False
         except OverrideError as exc:
             self._toast(str(exc))
             return False
@@ -915,6 +950,15 @@ class GlyphWindow(Adw.ApplicationWindow):
         app = self._find(self._detail_id)
         if app is None:
             return False
+        if can_delete_managed_icon(app.desktop_id):
+            dialogs.prompt_artwork_cleanup(
+                self,
+                app.name,
+                heading=f"Replace artwork for {app.name}?",
+                body="Glyph has a saved copy of custom artwork for this application. Would you like to keep the image in icon storage for later reuse, or delete it?",
+                on_choice=lambda delete: self._apply_icon_path(app, path, delete_icon=delete),
+            )
+            return True
         return self._apply_icon_path(app, path)
 
     def _on_change(self, _button: Gtk.Button) -> None:
@@ -949,18 +993,74 @@ class GlyphWindow(Adw.ApplicationWindow):
         app = self._find(self._detail_id)
         if app is None:
             return
-        self._apply_icon_path(app, path)
+        if can_delete_managed_icon(app.desktop_id):
+            dialogs.prompt_artwork_cleanup(
+                self,
+                app.name,
+                heading=f"Replace artwork for {app.name}?",
+                body="Glyph has a saved copy of custom artwork for this application. Would you like to keep the image in icon storage for later reuse, or delete it?",
+                on_choice=lambda delete: self._apply_icon_path(app, path, delete_icon=delete),
+            )
+        else:
+            self._apply_icon_path(app, path)
+
+    def _discard_overrides(self, app: AppEntry | None) -> None:
+        if not app:
+            return
+
+        def do_discard(delete_icon: bool = False):
+            try:
+                discard_override(app.desktop_id, delete_icon=delete_icon)
+            except OverrideError as exc:
+                self._toast(str(exc))
+                return
+            self.reload()
+            self._toast(f"Discarded overrides for {app.name}.")
+
+        if can_delete_managed_icon(app.desktop_id):
+            dialogs.prompt_artwork_cleanup(
+                self,
+                app.name,
+                heading=f"Custom artwork for {app.name}",
+                body=f"Glyph has a saved copy of custom artwork for “{app.name}”. Would you like to keep the image in icon storage for later reuse, or delete it?",
+                on_choice=do_discard,
+            )
+        else:
+            do_discard(delete_icon=False)
 
     def _on_revert(self, _button: Gtk.Button) -> None:
         if not self._detail_id:
             return
-        try:
-            revert_icon(self._detail_id)
-        except OverrideError as exc:
-            self._toast(str(exc))
-            return
-        self.reload()
-        self._toast("Original icon restored.")
+        app = self._find(self._detail_id) if hasattr(self, "_find") else None
+
+        def do_revert(delete_icon: bool = False):
+            try:
+                revert_icon(self._detail_id, delete_icon=delete_icon)
+            except LauncherModifiedExternallyError:
+                app_name = app.name if app else "application"
+                dialogs.prompt_external_modification(
+                    self,
+                    app_name,
+                    allow_overwrite=False,
+                    on_discard=lambda: self._discard_overrides(app),
+                )
+                return
+            except OverrideError as exc:
+                self._toast(str(exc))
+                return
+            self.reload()
+            self._toast("Original icon restored.")
+
+        if can_delete_managed_icon(self._detail_id):
+            dialogs.prompt_artwork_cleanup(
+                self,
+                app.name if app else "application",
+                heading=f"Restore original icon for {app.name if app else 'application'}?",
+                body="Would you like to keep the custom artwork in your icon storage for later reuse, or delete it?",
+                on_choice=do_revert,
+            )
+        else:
+            do_revert(delete_icon=False)
 
     def _on_restore_stock(self, _button: Gtk.Button) -> None:
         if not self._detail_id:
@@ -968,29 +1068,67 @@ class GlyphWindow(Adw.ApplicationWindow):
         app = self._find(self._detail_id)
         if app is None:
             return
-        dialog = Adw.AlertDialog(
-            heading=f"Restore default launcher for {app.name}?",
-            body=(
-                "This will remove your local overrides and restore the application "
-                "to its original stock name and icon as provided by the package install."
-            ),
-        )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("restore", "Restore Default")
-        dialog.set_response_appearance("restore", Adw.ResponseAppearance.DESTRUCTIVE)
 
-        def on_response(_d, response):
-            if response == "restore":
-                try:
-                    restore_stock_launcher(app.desktop_id)
-                except OverrideError as exc:
-                    self._toast(str(exc))
-                    return
-                self.reload()
-                self._toast(f"Restored default launcher for {app.name}.")
+        def do_restore(force: bool = False, delete_icon: bool = False):
+            try:
+                restore_stock_launcher(app.desktop_id, force=force, delete_icon=delete_icon)
+            except LauncherModifiedExternallyError:
+                dialogs.prompt_external_modification(
+                    self,
+                    app.name,
+                    allow_overwrite=True,
+                    on_overwrite=lambda: do_restore(force=True, delete_icon=delete_icon),
+                    on_discard=lambda: self._discard_overrides(app),
+                )
+                return
+            except OverrideError as exc:
+                self._toast(str(exc))
+                return
+            self.reload()
+            self._toast(f"Restored default launcher for {app.name}.")
 
-        dialog.connect("response", on_response)
-        dialog.present(self)
+        if can_delete_managed_icon(app.desktop_id):
+            dialog = Adw.AlertDialog(
+                heading=f"Restore default launcher for {app.name}?",
+                body=(
+                    "This will remove your local overrides and restore the application "
+                    "to its original stock launcher. Would you like to keep your saved custom artwork "
+                    "in icon storage for later reuse, or delete it?"
+                ),
+            )
+            dialog.add_response("cancel", "Cancel")
+            dialog.add_response("keep", "Keep Artwork")
+            dialog.add_response("delete", "Delete Artwork")
+            dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+            dialog.set_default_response("keep")
+            dialog.set_close_response("cancel")
+
+            def on_response(_d, response):
+                if response == "keep":
+                    do_restore(force=False, delete_icon=False)
+                elif response == "delete":
+                    do_restore(force=False, delete_icon=True)
+
+            dialog.connect("response", on_response)
+            dialog.present(self)
+        else:
+            dialog = Adw.AlertDialog(
+                heading=f"Restore default launcher for {app.name}?",
+                body=(
+                    "This will remove your local overrides and restore the application "
+                    "to its original stock name and icon as provided by the package install."
+                ),
+            )
+            dialog.add_response("cancel", "Cancel")
+            dialog.add_response("restore", "Restore Default")
+            dialog.set_response_appearance("restore", Adw.ResponseAppearance.DESTRUCTIVE)
+
+            def on_response(_d, response):
+                if response == "restore":
+                    do_restore(force=False, delete_icon=False)
+
+            dialog.connect("response", on_response)
+            dialog.present(self)
 
     def _on_edit_command_clicked(self, _widget: object) -> None:
         if not self._detail_id:
@@ -1025,13 +1163,26 @@ class GlyphWindow(Adw.ApplicationWindow):
                 if not source_desktop:
                     self._toast("No desktop file found to override.")
                     return
-                try:
-                    apply_command(app.desktop_id, source_desktop, new_cmd)
-                except OverrideError as exc:
-                    self._toast(str(exc))
-                    return
-                self.reload()
-                self._toast("Custom command saved.")
+
+                def do_save_cmd(cmd: str, force: bool = False):
+                    try:
+                        apply_command(app.desktop_id, source_desktop, cmd, force=force)
+                    except LauncherModifiedExternallyError:
+                        dialogs.prompt_external_modification(
+                            self,
+                            app.name,
+                            allow_overwrite=True,
+                            on_overwrite=lambda: do_save_cmd(cmd, force=True),
+                            on_discard=lambda: self._discard_overrides(app),
+                        )
+                        return
+                    except OverrideError as exc:
+                        self._toast(str(exc))
+                        return
+                    self.reload()
+                    self._toast("Custom command saved.")
+
+                do_save_cmd(new_cmd, force=False)
 
         dialog.connect("response", on_response)
         dialog.present(self)
@@ -1039,8 +1190,18 @@ class GlyphWindow(Adw.ApplicationWindow):
     def _on_command_reset(self, _button: Gtk.Button) -> None:
         if not self._detail_id:
             return
+        app = self._find(self._detail_id) if hasattr(self, "_find") else None
         try:
             revert_command(self._detail_id)
+        except LauncherModifiedExternallyError:
+            app_name = app.name if app else "application"
+            dialogs.prompt_external_modification(
+                self,
+                app_name,
+                allow_overwrite=False,
+                on_discard=lambda: self._discard_overrides(app),
+            )
+            return
         except OverrideError as exc:
             self._toast(str(exc))
             return
@@ -1119,34 +1280,64 @@ class GlyphWindow(Adw.ApplicationWindow):
         if app is None:
             return
 
-        dialog = Adw.AlertDialog(
-            heading=f"Unregister launcher for {app.name}?",
-            body=(
-                "This will remove the desktop launcher and custom icons created by Glyph, "
-                "leaving the AppImage binary files intact in your Applications folder."
-            ),
-        )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("unregister", "Unregister Launcher")
-        dialog.set_response_appearance("unregister", Adw.ResponseAppearance.DESTRUCTIVE)
-
-        def on_response(_d, response):
-            if response == "unregister":
-                try:
-                    res = appimage.unregister_appimage(app.desktop_id)
-                except Exception as exc:
-                    self._toast(str(exc))
-                    return
-                self.nav.pop()
-                self._detail_id = None
-                self.reload()
-                if res and res.get("icon_skipped"):
-                    self._toast(f"Unregistered launcher for {app.name}. Modified icon and binary file preserved.")
+        def do_unregister(delete_icon: bool | None = None):
+            try:
+                if delete_icon is not None:
+                    res = appimage.unregister_appimage(app.desktop_id, delete_icon=delete_icon)
                 else:
-                    self._toast(f"Unregistered launcher for {app.name}. Binary file preserved.")
+                    res = appimage.unregister_appimage(app.desktop_id)
+            except Exception as exc:
+                self._toast(str(exc))
+                return
+            self.nav.pop()
+            self._detail_id = None
+            self.reload()
+            if res and res.get("icon_skipped"):
+                self._toast(f"Unregistered launcher for {app.name}. Modified icon and binary file preserved.")
+            else:
+                self._toast(f"Unregistered launcher for {app.name}. Binary file preserved.")
 
-        dialog.connect("response", on_response)
-        dialog.present(self)
+        if can_delete_managed_icon(app.desktop_id):
+            dialog = Adw.AlertDialog(
+                heading=f"Unregister launcher for {app.name}?",
+                body=(
+                    "This will remove the desktop launcher created by Glyph while leaving the AppImage binary intact. "
+                    "Would you like to keep the extracted artwork in your icon storage for later reuse, or delete it?"
+                ),
+            )
+            dialog.add_response("cancel", "Cancel")
+            dialog.add_response("keep", "Keep Artwork")
+            dialog.add_response("delete", "Delete Artwork")
+            dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+            dialog.set_default_response("keep")
+            dialog.set_close_response("cancel")
+
+            def on_response(_d, response):
+                if response == "keep":
+                    do_unregister(delete_icon=False)
+                elif response == "delete":
+                    do_unregister(delete_icon=True)
+
+            dialog.connect("response", on_response)
+            dialog.present(self)
+        else:
+            dialog = Adw.AlertDialog(
+                heading=f"Unregister launcher for {app.name}?",
+                body=(
+                    "This will remove the desktop launcher created by Glyph, "
+                    "leaving the AppImage binary files intact in your Applications folder."
+                ),
+            )
+            dialog.add_response("cancel", "Cancel")
+            dialog.add_response("unregister", "Unregister Launcher")
+            dialog.set_response_appearance("unregister", Adw.ResponseAppearance.DESTRUCTIVE)
+
+            def on_response(_d, response):
+                if response == "unregister":
+                    do_unregister()
+
+            dialog.connect("response", on_response)
+            dialog.present(self)
 
     def _on_add_appimage(self, *_args) -> None:
         dialog = Gtk.FileDialog(title="Choose an AppImage")

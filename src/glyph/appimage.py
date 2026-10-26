@@ -436,6 +436,54 @@ def register_appimage(
     if launcher_path.exists():
         raise AppImageError(f"A launcher named '{desktop_id}' already exists. Please choose a different name.")
 
+    # Validate optional custom icon upfront before touching the binary
+    icon_value = "application-x-executable"
+    icon_file_to_save: tuple[Path, bytes] | None = None
+    icon_hash = ""
+
+    if custom_icon_path:
+        custom_icon = Path(custom_icon_path).expanduser()
+        if not custom_icon.is_file():
+            raise AppImageError(f"The selected custom icon file does not exist: {custom_icon.name}")
+        try:
+            icon_bytes = _read(custom_icon, MAX_APPIMAGE_ICON_BYTES)
+            from glyph.overrides import validate_image
+            validate_image(icon_bytes, custom_icon.suffix)
+        except Exception as exc:
+            raise AppImageError(f"Invalid custom icon: {exc}") from exc
+        icon_hash = hashlib.sha256(icon_bytes).hexdigest()
+        icon_dest = ICONS_DIR / f"{desktop_id}-{icon_hash[:12]}{custom_icon.suffix.lower()}"
+        icon_file_to_save = (icon_dest, icon_bytes)
+        icon_value = str(icon_dest)
+    elif plan.icon_data and plan.icon_suffix:
+        icon_bytes = plan.icon_data
+        icon_hash = hashlib.sha256(icon_bytes).hexdigest()
+        icon_dest = ICONS_DIR / f"{desktop_id}-{icon_hash[:12]}{plan.icon_suffix}"
+        icon_file_to_save = (icon_dest, icon_bytes)
+        icon_value = str(icon_dest)
+    elif plan.icon_name:
+        icon_value = plan.icon_name
+
+    # Validate state and desktop serialization before touching the managed binary
+    state = load_state()
+
+    host_exec = paths.host_applications_dir() / managed.name if paths.in_flatpak() else managed
+    kf = GLib.KeyFile()
+    kf.set_string("Desktop Entry", "Type", "Application")
+    clean_display_name = " ".join(final_name.splitlines()).strip()
+    kf.set_string("Desktop Entry", "Name", clean_display_name)
+    kf.set_string("Desktop Entry", "Exec", f'"{host_exec}" %U')
+    kf.set_string("Desktop Entry", "Icon", icon_value)
+    kf.set_boolean("Desktop Entry", "Terminal", False)
+    kf.set_string("Desktop Entry", "Categories", "Utility;")
+    kf.set_string("Desktop Entry", "X-AppImage-Source", str(source))
+    kf.set_string("Desktop Entry", "X-Glyph-Managed", "true")
+    try:
+        desktop_content = kf.to_data()[0].encode("utf-8")
+    except Exception as exc:
+        raise AppImageError(f"Failed to serialize desktop launcher: {exc}") from exc
+    launcher_hash = hashlib.sha256(desktop_content).hexdigest()
+
     created_managed_file: Path | None = None
     if not plan.is_in_place:
         if managed.exists():
@@ -457,72 +505,33 @@ def register_appimage(
     else:
         try:
             os.chmod(managed, managed.stat().st_mode | 0o755)
-        except OSError:
-            pass
-
-    # Host-visible execution path
-    host_exec = paths.host_applications_dir() / managed.name if paths.in_flatpak() else managed
-
-    # Determine icon and hash
-    icon_value = "application-x-executable"
-    icon_file_to_save: tuple[Path, bytes] | None = None
-    icon_hash = ""
-
-    if custom_icon_path and Path(custom_icon_path).is_file():
-        custom_icon = Path(custom_icon_path)
-        icon_bytes = _read(custom_icon, MAX_APPIMAGE_ICON_BYTES)
-        icon_hash = hashlib.sha256(icon_bytes).hexdigest()
-        icon_dest = ICONS_DIR / f"{desktop_id}-{icon_hash[:12]}{custom_icon.suffix.lower()}"
-        icon_file_to_save = (icon_dest, icon_bytes)
-        icon_value = str(icon_dest)
-    elif plan.icon_data and plan.icon_suffix:
-        icon_bytes = plan.icon_data
-        icon_hash = hashlib.sha256(icon_bytes).hexdigest()
-        icon_dest = ICONS_DIR / f"{desktop_id}-{icon_hash[:12]}{plan.icon_suffix}"
-        icon_file_to_save = (icon_dest, icon_bytes)
-        icon_value = str(icon_dest)
-    elif plan.icon_name:
-        icon_value = plan.icon_name
-
-    # Serialize Desktop Entry with GLib.KeyFile
-    kf = GLib.KeyFile()
-    kf.set_string("Desktop Entry", "Type", "Application")
-    clean_display_name = " ".join(final_name.splitlines()).strip()
-    kf.set_string("Desktop Entry", "Name", clean_display_name)
-    kf.set_string("Desktop Entry", "Exec", f'"{host_exec}" %U')
-    kf.set_string("Desktop Entry", "Icon", icon_value)
-    kf.set_boolean("Desktop Entry", "Terminal", False)
-    kf.set_string("Desktop Entry", "Categories", "Utility;")
-    kf.set_string("Desktop Entry", "X-AppImage-Source", str(source))
-    kf.set_string("Desktop Entry", "X-Glyph-Managed", "true")
-    desktop_content = kf.to_data()[0].encode("utf-8")
-    launcher_hash = hashlib.sha256(desktop_content).hexdigest()
-
-    state = load_state()
-    record = {
-        "created_local": True,
-        "glyph_managed_appimage": True,
-        "appimage_source": str(source),
-        "appimage_managed": str(managed),
-        "local_desktop": str(launcher_path),
-        "source_path": str(launcher_path),
-        "original_name": clean_display_name,
-        "original_icon": icon_value,
-        "original_command": f'"{host_exec}" %U',
-        "original_text": desktop_content.decode("utf-8", errors="replace"),
-        "last_hash": launcher_hash,
-        "icon_path": str(icon_file_to_save[0]) if icon_file_to_save else "",
-        "icon_hash": icon_hash if icon_file_to_save else "",
-    }
-    if paths.in_flatpak():
-        record["launcher_storage"] = FLATPAK_LAUNCHER_STORAGE
-    state[desktop_id] = record
-
-    writes: dict[Path, bytes | None] = {launcher_path: desktop_content}
-    if icon_file_to_save:
-        writes[icon_file_to_save[0]] = icon_file_to_save[1]
+        except OSError as exc:
+            raise AppImageError(f"Failed to make AppImage executable: {exc}") from exc
 
     try:
+        record = {
+            "created_local": True,
+            "glyph_managed_appimage": True,
+            "appimage_source": str(source),
+            "appimage_managed": str(managed),
+            "local_desktop": str(launcher_path),
+            "source_path": str(launcher_path),
+            "original_name": clean_display_name,
+            "original_icon": icon_value,
+            "original_command": f'"{host_exec}" %U',
+            "original_text": desktop_content.decode("utf-8", errors="replace"),
+            "last_hash": launcher_hash,
+            "icon_path": str(icon_file_to_save[0]) if icon_file_to_save else "",
+            "icon_hash": icon_hash if icon_file_to_save else "",
+        }
+        if paths.in_flatpak():
+            record["launcher_storage"] = FLATPAK_LAUNCHER_STORAGE
+        state[desktop_id] = record
+
+        writes: dict[Path, bytes | None] = {launcher_path: desktop_content}
+        if icon_file_to_save:
+            writes[icon_file_to_save[0]] = icon_file_to_save[1]
+
         _commit(state, writes)
     except Exception:
         if created_managed_file and created_managed_file.exists():
@@ -537,7 +546,7 @@ def register_appimage(
 
 
 @operation
-def unregister_appimage(desktop_id: str) -> dict[str, bool]:
+def unregister_appimage(desktop_id: str, *, delete_icon: bool = True) -> dict[str, bool]:
     """Unregister an AppImage removing only unchanged Glyph-created desktop & icon assets."""
     _id(desktop_id)
     state = load_state()
@@ -569,27 +578,17 @@ def unregister_appimage(desktop_id: str) -> dict[str, bool]:
             "Unregistration was cancelled to preserve your changes."
         )
 
-    # Verify icon hash independently before deletion
-    icon_path_str = record.get("icon_path", "")
     icon_path_to_delete: Path | None = None
     icon_cleanup_skipped = False
+    icon_path_str = record.get("icon_path", "")
+
     if icon_path_str:
-        icon_path = Path(icon_path_str)
-        try:
-            _confined(icon_path, ICONS_DIR)
-            if icon_path.is_symlink():
-                icon_cleanup_skipped = True
-            elif icon_path.is_file():
-                current_icon_bytes = icon_path.read_bytes()
-                current_icon_hash = hashlib.sha256(current_icon_bytes).hexdigest()
-                expected_icon_hash = record.get("icon_hash", "")
-                if expected_icon_hash and current_icon_hash == expected_icon_hash:
-                    icon_path_to_delete = icon_path
-                else:
-                    # Missing hash with existing file or mismatched hash -> preserve icon
-                    icon_cleanup_skipped = True
-        except (OverrideError, OSError):
+        from glyph.overrides import check_managed_icon_deletion
+        eligible, asset_path, reason = check_managed_icon_deletion(desktop_id, state)
+        if not eligible and reason in ("modified", "missing_hash"):
             icon_cleanup_skipped = True
+        elif eligible and delete_icon and asset_path:
+            icon_path_to_delete = asset_path
 
     writes: dict[Path, bytes | None] = {launcher_path: None}
     if icon_path_to_delete:

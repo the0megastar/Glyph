@@ -61,7 +61,25 @@ def _backup_members(source: Path) -> dict[str, bytes]:
     return members
 
 
-def export_backup(target_path: Path) -> int:
+class ExportResult(int):
+    """Result of exporting a backup archive, preserving int compatibility."""
+    exported: int
+    omitted: int
+    omitted_commands: int
+    command_only: int
+    mixed: int
+
+    def __new__(cls, exported: int, omitted: int = 0, omitted_commands: int = 0, command_only: int = 0, mixed: int = 0):
+        obj = super().__new__(cls, exported)
+        obj.exported = exported
+        obj.omitted = omitted
+        obj.omitted_commands = omitted_commands
+        obj.command_only = command_only
+        obj.mixed = mixed
+        return obj
+
+
+def export_backup(target_path: Path) -> ExportResult:
     from glyph import overrides
     from glyph.overrides import (
         MAX_BACKUP_BYTES,
@@ -72,15 +90,20 @@ def export_backup(target_path: Path) -> int:
     )
 
     @overrides.operation
-    def _export() -> int:
+    def _export() -> ExportResult:
         state = load_state()
         entries = {}
         assets = {}
+        command_only = 0
+        mixed = 0
         for desktop_id, record in state.items():
             entry = {}
-            if record.get('custom_name'):
+            has_name = bool(record.get('custom_name'))
+            has_icon = bool(record.get('icon_path'))
+            has_cmd = bool(record.get('custom_command'))
+            if has_name:
                 entry['name'] = record['custom_name']
-            if record.get('icon_path'):
+            if has_icon:
                 image = Path(record['icon_path'])
                 data = _read(image, MAX_IMAGE_BYTES)
                 asset = 'icons/' + hashlib.sha256(data).hexdigest() + image.suffix.lower()
@@ -88,6 +111,11 @@ def export_backup(target_path: Path) -> int:
                 assets[asset] = data
             if entry:
                 entries[desktop_id] = entry
+            if has_cmd:
+                if not (has_name or has_icon):
+                    command_only += 1
+                else:
+                    mixed += 1
         payload = {'manifest.json': json.dumps({'version': 2, 'entries': entries}, indent=2).encode(), **assets}
         if sum(map(len, payload.values())) > MAX_BACKUP_BYTES:
             raise OverrideError('Backup exceeds 100 MiB.')
@@ -110,7 +138,14 @@ def export_backup(target_path: Path) -> int:
             os.replace(name, target_path)
         finally:
             Path(name).unlink(missing_ok=True)
-        return len(entries)
+        omitted_commands = command_only + mixed
+        return ExportResult(
+            len(entries),
+            omitted=omitted_commands,
+            omitted_commands=omitted_commands,
+            command_only=command_only,
+            mixed=mixed,
+        )
 
     return _export()
 

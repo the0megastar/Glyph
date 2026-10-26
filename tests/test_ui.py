@@ -333,6 +333,221 @@ class TestUI(unittest.TestCase):
             self.assertEqual(toasts, ["Cannot register AppImage: Not readable"])
             stub._show_appimage_registration_preview.assert_not_called()
 
+    def test_prompt_external_modification_responses(self):
+        alert = MagicMock()
+        parent = MagicMock()
+        mock_overwrite = MagicMock()
+        mock_discard = MagicMock()
+
+        with patch.object(dialogs.Adw, "AlertDialog", return_value=alert):
+            dialogs.prompt_external_modification(
+                parent,
+                "Grok Bot",
+                allow_overwrite=True,
+                on_overwrite=mock_overwrite,
+                on_discard=mock_discard,
+            )
+            cb = alert.connect.call_args.args[1]
+
+            # Overwrite response
+            cb(alert, "overwrite")
+            mock_overwrite.assert_called_once()
+            mock_discard.assert_not_called()
+
+            # Discard response
+            cb(alert, "discard")
+            mock_discard.assert_called_once()
+
+    def test_apply_icon_path_triggers_prompt_on_external_modification(self):
+        from glyph.overrides import LauncherModifiedExternallyError
+        app = SimpleNamespace(name="Grok Bot", desktop_id="grok-bot.desktop", filename="/path/grok.desktop", stock_filename=None)
+        stub = SimpleNamespace(
+            _toast=MagicMock(),
+            reload=MagicMock(),
+            _discard_overrides=MagicMock(),
+            _apply_icon_path=lambda app, path, force=False: window.GlyphWindow._apply_icon_path(stub, app, path, force=force),
+        )
+        with patch("glyph.window.apply_icon", side_effect=LauncherModifiedExternallyError("Modified", "grok-bot.desktop")), \
+             patch("glyph.dialogs.prompt_external_modification") as mock_prompt:
+            result = window.GlyphWindow._apply_icon_path(stub, app, "/new/icon.png")
+            self.assertFalse(result)
+            mock_prompt.assert_called_once()
+            self.assertEqual(mock_prompt.call_args.args[1], "Grok Bot")
+            self.assertTrue(mock_prompt.call_args.kwargs["allow_overwrite"])
+
+    def test_on_revert_triggers_prompt_on_external_modification(self):
+        from glyph.overrides import LauncherModifiedExternallyError
+        app = SimpleNamespace(name="Grok Bot", desktop_id="grok-bot.desktop")
+        stub = SimpleNamespace(
+            _detail_id="grok-bot.desktop",
+            _find=lambda _id: app,
+            _toast=MagicMock(),
+            reload=MagicMock(),
+            _discard_overrides=MagicMock(),
+        )
+        with patch("glyph.window.revert_icon", side_effect=LauncherModifiedExternallyError("Modified", "grok-bot.desktop")), \
+             patch("glyph.dialogs.prompt_external_modification") as mock_prompt:
+            window.GlyphWindow._on_revert(stub, MagicMock())
+            mock_prompt.assert_called_once()
+            self.assertEqual(mock_prompt.call_args.args[1], "Grok Bot")
+            self.assertFalse(mock_prompt.call_args.kwargs["allow_overwrite"])
+
+    def test_prompt_artwork_cleanup_responses(self):
+        alert = MagicMock()
+        parent = MagicMock()
+        mock_choice = MagicMock()
+        mock_cancel = MagicMock()
+
+        with patch.object(dialogs.Adw, "AlertDialog", return_value=alert):
+            dialogs.prompt_artwork_cleanup(
+                parent,
+                "Test App",
+                heading="Artwork Heading",
+                body="Artwork Body",
+                on_choice=mock_choice,
+                on_cancel=mock_cancel,
+            )
+            cb = alert.connect.call_args.args[1]
+
+            # Choose Keep (delete_icon=False)
+            cb(alert, "keep")
+            mock_choice.assert_called_once_with(False)
+            mock_choice.reset_mock()
+
+            # Choose Delete (delete_icon=True)
+            cb(alert, "delete")
+            mock_choice.assert_called_once_with(True)
+            mock_choice.reset_mock()
+
+            # Choose Cancel
+            cb(alert, "cancel")
+            mock_choice.assert_not_called()
+            mock_cancel.assert_called_once()
+
+    def test_export_overrides_dialog_only_commands_shows_toast_and_no_file_dialog(self):
+        parent = MagicMock()
+        state = {
+            "cmd.desktop": {
+                "custom_command": "some-cmd",
+            }
+        }
+        with patch("glyph.dialogs.load_state", return_value=state), \
+             patch.object(dialogs.Adw, "AlertDialog") as mock_alert, \
+             patch.object(dialogs.Gtk, "FileDialog") as mock_file_dialog:
+            dialogs.export_overrides_dialog(parent)
+            parent._toast.assert_called_once()
+            toast_msg = parent._toast.call_args.args[0]
+            self.assertIn("No supported customizations to export", toast_msg)
+            self.assertIn("exclude custom launch commands", toast_msg)
+            mock_alert.assert_not_called()
+            mock_file_dialog.assert_not_called()
+
+    def test_export_overrides_dialog_explains_and_reports_omitted_commands(self):
+        parent = MagicMock()
+        state = {
+            "app1.desktop": {"custom_name": "New Name"},
+            "cmd.desktop": {"custom_command": "some-cmd"},
+        }
+        alert = MagicMock()
+        file_dialog = MagicMock()
+
+        from glyph.backups import ExportResult
+        fake_result = ExportResult(1, omitted=1, command_only=1, mixed=0)
+
+        with patch("glyph.dialogs.load_state", return_value=state), \
+             patch.object(dialogs.Adw, "AlertDialog", return_value=alert) as mock_alert_cls, \
+             patch.object(dialogs.Gtk, "FileDialog", return_value=file_dialog), \
+             patch("glyph.dialogs.export_backup", return_value=fake_result):
+
+            dialogs.export_overrides_dialog(parent)
+            alert.present.assert_called_once_with(parent)
+
+            # Confirm explanation dialog mentions omitted command
+            self.assertIn("1 custom launch command will be omitted", mock_alert_cls.call_args.kwargs["body"])
+
+            # User confirms "export"
+            explain_cb = alert.connect.call_args.args[1]
+            explain_cb(alert, "export")
+
+            # FileDialog was saved
+            file_dialog.save.assert_called_once()
+            on_save_done = file_dialog.save.call_args.args[2]
+
+            # Simulate save completion
+            fake_file = MagicMock()
+            fake_file.get_path.return_value = "/path/to/backup.tar.gz"
+            file_dialog.save_finish.return_value = fake_file
+
+            on_save_done(file_dialog, MagicMock())
+            parent._toast.assert_called_once_with("Exported 1 customization (1 command omitted).")
+
+    def test_window_on_revert_with_and_without_managed_icon(self):
+        app = SimpleNamespace(name="Revert App", desktop_id="revert.desktop")
+        stub = SimpleNamespace(
+            _detail_id="revert.desktop",
+            _find=lambda _id: app,
+            _toast=MagicMock(),
+            reload=MagicMock(),
+            _discard_overrides=MagicMock(),
+        )
+
+        # Case 1: can_delete_managed_icon is True -> prompts keep/delete
+        with patch("glyph.window.can_delete_managed_icon", return_value=True), \
+             patch("glyph.dialogs.prompt_artwork_cleanup") as mock_prompt, \
+             patch("glyph.window.revert_icon") as mock_revert:
+            window.GlyphWindow._on_revert(stub, MagicMock())
+            mock_prompt.assert_called_once()
+            on_choice = mock_prompt.call_args.kwargs["on_choice"]
+
+            # User chooses delete
+            on_choice(delete_icon=True)
+            mock_revert.assert_called_once_with("revert.desktop", delete_icon=True)
+
+        # Case 2: can_delete_managed_icon is False -> reverts directly with delete_icon=False
+        with patch("glyph.window.can_delete_managed_icon", return_value=False), \
+             patch("glyph.dialogs.prompt_artwork_cleanup") as mock_prompt, \
+             patch("glyph.window.revert_icon") as mock_revert:
+            window.GlyphWindow._on_revert(stub, MagicMock())
+            mock_prompt.assert_not_called()
+            mock_revert.assert_called_once_with("revert.desktop", delete_icon=False)
+
+    def test_window_on_restore_stock_with_and_without_managed_icon(self):
+        app = SimpleNamespace(name="Stock App", desktop_id="stock.desktop")
+        stub = SimpleNamespace(
+            _detail_id="stock.desktop",
+            _find=lambda _id: app,
+            _toast=MagicMock(),
+            reload=MagicMock(),
+            _discard_overrides=MagicMock(),
+        )
+
+        # Case 1: can_delete_managed_icon is True -> prompts keep/delete dialog
+        alert1 = MagicMock()
+        with patch("glyph.window.can_delete_managed_icon", return_value=True), \
+             patch.object(dialogs.Adw, "AlertDialog", return_value=alert1), \
+             patch("glyph.window.restore_stock_launcher") as mock_restore:
+            window.GlyphWindow._on_restore_stock(stub, MagicMock())
+            alert1.present.assert_called_once()
+            cb = alert1.connect.call_args.args[1]
+
+            # Choose keep
+            cb(alert1, "keep")
+            mock_restore.assert_called_once_with("stock.desktop", force=False, delete_icon=False)
+
+        # Case 2: can_delete_managed_icon is False -> standard restore confirmation dialog
+        alert2 = MagicMock()
+        with patch("glyph.window.can_delete_managed_icon", return_value=False), \
+             patch.object(dialogs.Adw, "AlertDialog", return_value=alert2), \
+             patch("glyph.window.restore_stock_launcher") as mock_restore:
+            window.GlyphWindow._on_restore_stock(stub, MagicMock())
+            alert2.present.assert_called_once()
+            cb = alert2.connect.call_args.args[1]
+
+            # Choose restore
+            cb(alert2, "restore")
+            mock_restore.assert_called_once_with("stock.desktop", force=False, delete_icon=False)
+
+
 if __name__ == "__main__":
     unittest.main()
 

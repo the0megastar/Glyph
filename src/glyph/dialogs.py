@@ -6,9 +6,12 @@ from gi.repository import Adw, Gio, GLib, Gtk, Pango
 
 from glyph.icon_themes import ThemeIcon, list_installed_themes, search_theme_icons
 from glyph.overrides import (
+    LauncherModifiedExternallyError,
     OverrideError,
     apply_icon,
     apply_theme_icon,
+    can_delete_managed_icon,
+    discard_override,
     export_backup,
     import_backup,
     load_state,
@@ -27,6 +30,100 @@ def _toast(parent: Gtk.Widget | None, message: str) -> None:
 def _reload(parent: Gtk.Widget | None) -> None:
     if parent and hasattr(parent, "reload"):
         parent.reload()
+
+
+def prompt_artwork_cleanup(
+    parent: Gtk.Widget | None,
+    app_name: str,
+    heading: str,
+    body: str,
+    on_choice,
+    on_cancel=None,
+) -> None:
+    dialog = Adw.AlertDialog(heading=heading, body=body)
+    dialog.add_response("cancel", "Cancel")
+    dialog.add_response("keep", "Keep Artwork")
+    dialog.add_response("delete", "Delete Artwork")
+    dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+    dialog.set_default_response("keep")
+    dialog.set_close_response("cancel")
+
+    def on_response(_d, response):
+        if response == "keep":
+            on_choice(False)
+        elif response == "delete":
+            on_choice(True)
+        elif response == "cancel" and on_cancel:
+            on_cancel()
+
+    dialog.connect("response", on_response)
+    dialog.present(parent)
+
+
+def handle_discard(parent: Gtk.Widget | None, desktop_id: str, app_name: str) -> None:
+    def do_discard(delete_icon: bool = False):
+        try:
+            discard_override(desktop_id, delete_icon=delete_icon)
+            _reload(parent)
+            _toast(parent, f"Discarded overrides for {app_name}.")
+        except OverrideError as exc:
+            _toast(parent, str(exc))
+
+    if can_delete_managed_icon(desktop_id):
+        prompt_artwork_cleanup(
+            parent,
+            app_name,
+            heading=f"Custom artwork for {app_name}",
+            body=f"Glyph has a saved copy of custom artwork for “{app_name}”. Would you like to keep the image in icon storage for later reuse, or delete it?",
+            on_choice=do_discard,
+        )
+    else:
+        do_discard(delete_icon=False)
+
+
+def prompt_external_modification(
+    parent: Gtk.Widget | None,
+    app_name: str,
+    *,
+    allow_overwrite: bool = True,
+    on_overwrite=None,
+    on_discard=None,
+) -> None:
+    """Prompt the user when an application launcher has been modified outside Glyph."""
+    dialog = Adw.AlertDialog(
+        heading="Launcher Modified Externally",
+        body=(
+            f"The desktop launcher for “{app_name}” was modified outside Glyph "
+            "(for example, by an application update).\n\n"
+            + (
+                "You can overwrite the launcher with your new changes, or discard "
+                "Glyph’s saved overrides to accept the external version."
+                if allow_overwrite
+                else "Would you like to discard Glyph’s saved overrides to synchronize with the current launcher?"
+            )
+        ),
+    )
+    dialog.add_response("cancel", "Cancel")
+    dialog.add_response("discard", "Discard Overrides")
+    dialog.set_response_appearance("discard", Adw.ResponseAppearance.DESTRUCTIVE)
+
+    if allow_overwrite:
+        dialog.add_response("overwrite", "Overwrite")
+        dialog.set_response_appearance("overwrite", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("overwrite")
+    else:
+        dialog.set_default_response("discard")
+
+    dialog.set_close_response("cancel")
+
+    def on_response(_d, response):
+        if response == "overwrite" and on_overwrite:
+            on_overwrite()
+        elif response == "discard" and on_discard:
+            on_discard()
+
+    dialog.connect("response", on_response)
+    dialog.present(parent)
 
 
 def show_refresh_help(parent: Gtk.Widget | None) -> None:
@@ -165,23 +262,63 @@ def export_overrides_dialog(parent: Gtk.Widget | None) -> None:
         _toast(parent, "No customizations to export.")
         return
 
-    dialog = Gtk.FileDialog(title="Export Overrides Backup")
-    dialog.set_initial_name("glyph-overrides-backup.tar.gz")
+    exportable_count = sum(1 for r in state.values() if r.get('custom_name') or r.get('icon_path'))
+    cmd_count = sum(1 for r in state.values() if r.get('custom_command'))
 
-    def on_save_done(dlg: Gtk.FileDialog, result: Gio.AsyncResult):
-        try:
-            file = dlg.save_finish(result)
-        except Exception:
-            return
-        if not file:
-            return
-        try:
-            n = export_backup(Path(file.get_path()))
-            _toast(parent, f"Exported {n} customization{'s' if n != 1 else ''}.")
-        except Exception as exc:
-            _toast(parent, f"Export failed: {exc}")
+    if exportable_count == 0:
+        _toast(parent, "No supported customizations to export. Backups cover custom names and icons, but exclude custom launch commands.")
+        return
 
-    dialog.save(parent, None, on_save_done)
+    def open_save_dialog():
+        dialog = Gtk.FileDialog(title="Export Overrides Backup")
+        dialog.set_initial_name("glyph-overrides-backup.tar.gz")
+
+        def on_save_done(dlg: Gtk.FileDialog, result: Gio.AsyncResult):
+            try:
+                file = dlg.save_finish(result)
+            except Exception:
+                return
+            if not file:
+                return
+            try:
+                res = export_backup(Path(file.get_path()))
+                if res.omitted:
+                    _toast(
+                        parent,
+                        f"Exported {res.exported} customization{'s' if res.exported != 1 else ''} "
+                        f"({res.omitted} command{'s' if res.omitted != 1 else ''} omitted)."
+                    )
+                else:
+                    _toast(parent, f"Exported {res.exported} customization{'s' if res.exported != 1 else ''}.")
+            except Exception as exc:
+                _toast(parent, f"Export failed: {exc}")
+
+        dialog.save(parent, None, on_save_done)
+
+    explain_dialog = Adw.AlertDialog(
+        heading="Export Customizations",
+        body=(
+            "Backup archives cover custom display names and icons.\n\n"
+            "Custom launch commands are excluded so backup archives cannot execute arbitrary code when restored."
+            + (
+                f"\n\nNote: {cmd_count} custom launch command{'s' if cmd_count != 1 else ''} will be omitted from the backup."
+                if cmd_count > 0
+                else ""
+            )
+        ),
+    )
+    explain_dialog.add_response("cancel", "Cancel")
+    explain_dialog.add_response("export", "Export…")
+    explain_dialog.set_response_appearance("export", Adw.ResponseAppearance.SUGGESTED)
+    explain_dialog.set_default_response("export")
+    explain_dialog.set_close_response("cancel")
+
+    def on_explain_response(_d, response):
+        if response == "export":
+            open_save_dialog()
+
+    explain_dialog.connect("response", on_explain_response)
+    explain_dialog.present(parent)
 
 
 def handle_import_open_done(parent: Gtk.Widget | None, dlg: Gtk.FileDialog, result: Gio.AsyncResult) -> None:
@@ -330,22 +467,42 @@ def show_icon_picker(parent: Gtk.Widget | None, app: object, on_open_file_callba
         choice.set_default_response("theme")
         choice.set_close_response("cancel")
 
-        def on_choice_resp(_d, resp):
+        def on_choice_resp(_c, resp):
             if resp in ("theme", "fixed"):
                 dialog.close()
                 source_desktop = getattr(app, "filename", "") or getattr(app, "stock_filename", "")
                 desktop_id = getattr(app, "desktop_id", "")
-                try:
-                    if resp == "theme":
-                        apply_theme_icon(desktop_id, source_desktop, icon.name)
-                        _toast(parent, f"Theme icon '{icon.name}' applied.")
-                    else:
-                        apply_icon(desktop_id, source_desktop, icon.file_path)
-                        _toast(parent, f"Fixed icon '{icon.name}' applied.")
-                except OverrideError as exc:
-                    _toast(parent, str(exc))
-                    return
-                _reload(parent)
+
+                def do_apply(force: bool = False, delete_icon: bool = False):
+                    try:
+                        if resp == "theme":
+                            apply_theme_icon(desktop_id, source_desktop, icon.name, force=force, delete_icon=delete_icon)
+                            _toast(parent, f"Theme icon '{icon.name}' applied.")
+                        else:
+                            apply_icon(desktop_id, source_desktop, icon.file_path, force=force, delete_icon=delete_icon)
+                            _toast(parent, f"Fixed icon '{icon.name}' applied.")
+                        _reload(parent)
+                    except LauncherModifiedExternallyError:
+                        prompt_external_modification(
+                            parent,
+                            app_name,
+                            allow_overwrite=True,
+                            on_overwrite=lambda: do_apply(force=True, delete_icon=delete_icon),
+                            on_discard=lambda: handle_discard(parent, desktop_id, app_name),
+                        )
+                    except OverrideError as exc:
+                        _toast(parent, str(exc))
+
+                if can_delete_managed_icon(desktop_id):
+                    prompt_artwork_cleanup(
+                        parent,
+                        app_name,
+                        heading=f"Replace artwork for {app_name}?",
+                        body="Glyph has a saved copy of custom artwork for this application. Would you like to keep the image in icon storage for later reuse, or delete it?",
+                        on_choice=lambda delete: do_apply(force=False, delete_icon=delete),
+                    )
+                else:
+                    do_apply(force=False, delete_icon=False)
 
         choice.connect("response", on_choice_resp)
         choice.present(dialog)

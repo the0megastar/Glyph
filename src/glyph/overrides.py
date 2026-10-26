@@ -63,6 +63,14 @@ class OverrideError(Exception):
     """An actionable error safe to display to the user."""
 
 
+class LauncherModifiedExternallyError(OverrideError):
+    """Raised when a desktop file has been modified externally since Glyph recorded its state."""
+
+    def __init__(self, message: str, desktop_id: str):
+        super().__init__(message)
+        self.desktop_id = desktop_id
+
+
 @dataclass
 class BatchResult:
     completed: int = 0
@@ -375,7 +383,71 @@ def _local_path_for(source: Path, desktop_id: str) -> Path:
     return local
 
 
-def _prepare(state: dict, desktop_id: str, source_desktop: str):
+def _is_icon_eligible_for_deletion(asset_path: Path, expected_hash: str | None, desktop_id: str, state: dict) -> bool:
+    try:
+        _confined(asset_path, ICONS_DIR)
+    except OverrideError:
+        return False
+    if asset_path.is_symlink() or not asset_path.is_file():
+        return False
+    if any(r.get('icon_path') == str(asset_path) for k, r in state.items() if k != desktop_id):
+        return False
+    if not expected_hash:
+        return False
+    try:
+        if hashlib.sha256(asset_path.read_bytes()).hexdigest() != expected_hash:
+            return False
+    except OSError:
+        return False
+    return True
+
+
+def check_managed_icon_deletion(desktop_id: str, state: dict | None = None) -> tuple[bool, Path | None, str | None]:
+    """Check whether a desktop entry has a Glyph-managed icon eligible for deletion.
+
+    Returns (eligible, path, reason):
+    - (True, path, None) if the icon file is managed by Glyph, unreferenced by other entries, and unchanged.
+    - (False, None, None) if no managed icon file is recorded.
+    - (False, path, "shared") if another entry references the same icon file.
+    - (False, path, "modified") if the icon file was modified externally (hash mismatch).
+    - (False, path, "missing") if the icon file does not exist.
+    """
+    if state is None:
+        state = load_state()
+    record = state.get(desktop_id)
+    if not record or not record.get('icon_path'):
+        return False, None, None
+    asset = record['icon_path']
+    asset_path = Path(asset)
+    try:
+        _confined(asset_path, ICONS_DIR)
+    except OverrideError:
+        return False, None, None
+    if asset_path.is_symlink():
+        return False, None, None
+    if not asset_path.is_file():
+        return False, asset_path, "missing"
+    if any(r.get('icon_path') == asset for k, r in state.items() if k != desktop_id):
+        return False, asset_path, "shared"
+    expected_hash = record.get('icon_hash')
+    if not expected_hash:
+        return False, asset_path, "missing_hash"
+    try:
+        current_hash = hashlib.sha256(asset_path.read_bytes()).hexdigest()
+        if current_hash != expected_hash:
+            return False, asset_path, "modified"
+    except OSError:
+        return False, asset_path, "unreadable"
+    return True, asset_path, None
+
+
+def can_delete_managed_icon(desktop_id: str, state: dict | None = None) -> bool:
+    """Convenience check: True if desktop_id has an eligible, unreferenced, hash-matched managed icon."""
+    eligible, _, _ = check_managed_icon_deletion(desktop_id, state)
+    return eligible
+
+
+def _prepare(state: dict, desktop_id: str, source_desktop: str, *, force: bool = False):
     _id(desktop_id)
     source = Path(source_desktop)
     if not source_desktop or not source.is_file():
@@ -386,7 +458,11 @@ def _prepare(state: dict, desktop_id: str, source_desktop: str):
     _replace_lines(text, 'Name', _snapshot_lines(text, 'Name'))
     record = dict(state.get(desktop_id, {}))
     if record.get('last_hash') and record['last_hash'] != _digest(text.encode()):
-        raise OverrideError('This launcher changed outside Glyph. Export your preferences and resolve the external changes before editing it.')
+        if not force:
+            raise LauncherModifiedExternallyError(
+                'This launcher changed outside Glyph. Export your preferences and resolve the external changes before editing it.',
+                desktop_id=desktop_id,
+            )
     if not record:
         record = {'created_local': not local.exists(), 'source_path': str(source),
                   'local_desktop': str(local), 'original_text': text}
@@ -434,9 +510,22 @@ def validate_image(data: bytes, suffix: str) -> None:
         raise OverrideError(f'The selected image cannot be decoded: {exc.message}') from exc
 
 
-def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=None, theme_icon=None, command=None):
-    local, text, record = _prepare(state, desktop_id, source_desktop)
+def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=None, theme_icon=None, command=None, force: bool = False, delete_icon: bool = True):
+    local, text, record = _prepare(state, desktop_id, source_desktop, force=force)
     writes = {}
+
+    if force and record:
+        # Rebase still-active saved overrides that this operation is not replacing
+        if image is None and theme_icon is None:
+            if record.get('icon_path'):
+                text = set_icon_value(text, record['icon_path'])
+            elif record.get('theme_icon'):
+                text = set_icon_value(text, record['theme_icon'])
+        if name is None and record.get('custom_name'):
+            text = set_name_value(text, record['custom_name'])
+        if command is None and record.get('custom_command'):
+            text = set_exec_value(text, record['custom_command'])
+
     if image is not None:
         validate_image(image, suffix)
         id_hash = hashlib.sha256(desktop_id.encode('utf-8')).hexdigest()[:16]
@@ -447,19 +536,18 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
             record['original_icon_lines'] = _snapshot_lines(text, 'Icon')
         old = record.get('icon_path')
         old_hash = record.get('icon_hash')
+        old_path_to_delete = None
+        if old and old != str(dest) and delete_icon:
+            old_path = Path(old)
+            if _is_icon_eligible_for_deletion(old_path, old_hash, desktop_id, state):
+                old_path_to_delete = old_path
         record.pop('theme_icon', None)
         record['icon_path'] = str(dest)
         record['icon_hash'] = hashlib.sha256(image).hexdigest()
         writes[dest] = image
         text = set_icon_value(text, str(dest))
-        if old and old != str(dest) and not any(r.get('icon_path') == old for k, r in state.items() if k != desktop_id):
-            old_path = Path(old)
-            if old_hash and old_path.is_file():
-                try:
-                    if hashlib.sha256(old_path.read_bytes()).hexdigest() == old_hash:
-                        writes[old_path] = None
-                except OSError:
-                    pass
+        if old_path_to_delete:
+            writes[old_path_to_delete] = None
     if theme_icon is not None:
         theme_icon = theme_icon.strip()
         if not theme_icon or len(theme_icon) > 256 or '/' in theme_icon or '\\' in theme_icon or any(ord(c) < 32 for c in theme_icon):
@@ -469,18 +557,17 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
             record['original_icon_lines'] = _snapshot_lines(text, 'Icon')
         old = record.get('icon_path')
         old_hash = record.get('icon_hash')
+        old_path_to_delete = None
+        if old and delete_icon:
+            old_path = Path(old)
+            if _is_icon_eligible_for_deletion(old_path, old_hash, desktop_id, state):
+                old_path_to_delete = old_path
         record.pop('icon_path', None)
         record.pop('icon_hash', None)
         record['theme_icon'] = theme_icon
         text = set_icon_value(text, theme_icon)
-        if old and not any(r.get('icon_path') == old for k, r in state.items() if k != desktop_id):
-            old_path = Path(old)
-            if old_hash and old_path.is_file():
-                try:
-                    if hashlib.sha256(old_path.read_bytes()).hexdigest() == old_hash:
-                        writes[old_path] = None
-                except OSError:
-                    pass
+        if old_path_to_delete:
+            writes[old_path_to_delete] = None
     if name is not None:
         name = name.strip()
         if not name or len(name) > 256 or any(ord(c) < 32 for c in name):
@@ -507,39 +594,39 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
 
 
 @operation
-def apply_icon(desktop_id: str, source_desktop: str, image_path: str) -> dict:
+def apply_icon(desktop_id: str, source_desktop: str, image_path: str, *, force: bool = False, delete_icon: bool = True) -> dict:
     if not image_path:
         raise OverrideError('The selected file is not available as a local file.')
     image = Path(image_path).expanduser()
     state = load_state()  # Fail closed before changing files.
     record = _apply(state, desktop_id, source_desktop,
-                    image=_read(image, MAX_IMAGE_BYTES), suffix=image.suffix)
+                    image=_read(image, MAX_IMAGE_BYTES), suffix=image.suffix, force=force, delete_icon=delete_icon)
     refresh_desktop_database()
     return record
 
 
 @operation
-def apply_theme_icon(desktop_id: str, source_desktop: str, icon_name: str) -> dict:
-    record = _apply(load_state(), desktop_id, source_desktop, theme_icon=icon_name)
+def apply_theme_icon(desktop_id: str, source_desktop: str, icon_name: str, *, force: bool = False, delete_icon: bool = True) -> dict:
+    record = _apply(load_state(), desktop_id, source_desktop, theme_icon=icon_name, force=force, delete_icon=delete_icon)
     refresh_desktop_database()
     return record
 
 
 @operation
-def apply_name(desktop_id: str, source_desktop: str, new_name: str) -> dict:
-    record = _apply(load_state(), desktop_id, source_desktop, name=new_name)
+def apply_name(desktop_id: str, source_desktop: str, new_name: str, *, force: bool = False) -> dict:
+    record = _apply(load_state(), desktop_id, source_desktop, name=new_name, force=force)
     refresh_desktop_database()
     return record
 
 
 @operation
-def apply_command(desktop_id: str, source_desktop: str, new_command: str) -> dict:
-    record = _apply(load_state(), desktop_id, source_desktop, command=new_command)
+def apply_command(desktop_id: str, source_desktop: str, new_command: str, *, force: bool = False) -> dict:
+    record = _apply(load_state(), desktop_id, source_desktop, command=new_command, force=force)
     refresh_desktop_database()
     return record
 
 
-def _revert(desktop_id: str, key: str) -> None:
+def _revert(desktop_id: str, key: str, *, force: bool = False, delete_icon: bool = True) -> None:
     state = load_state()
     record = state.get(desktop_id)
     if key == 'Icon':
@@ -553,7 +640,20 @@ def _revert(desktop_id: str, key: str) -> None:
 
     if not record or not record.get(field):
         raise OverrideError(f'No custom {key.lower()} override for this app.')
-    local, text, record = _prepare(state, desktop_id, record['local_desktop'])
+    local, text, record = _prepare(state, desktop_id, record['local_desktop'], force=force)
+
+    if force and record:
+        # Rebase still-active saved overrides that this operation is not reverting
+        if key != 'Icon':
+            if record.get('icon_path'):
+                text = set_icon_value(text, record['icon_path'])
+            elif record.get('theme_icon'):
+                text = set_icon_value(text, record['theme_icon'])
+        if key != 'Name' and record.get('custom_name'):
+            text = set_name_value(text, record['custom_name'])
+        if key != 'Exec' and record.get('custom_command'):
+            text = set_exec_value(text, record['custom_command'])
+
     saved_key = 'exec' if key == 'Exec' else key.lower()
     saved = record.get('original_' + saved_key + '_lines')
     if saved is None:
@@ -567,6 +667,12 @@ def _revert(desktop_id: str, key: str) -> None:
     writes = {local: text.encode()}
     asset = record.get('icon_path') if key == 'Icon' else None
     asset_hash = record.get('icon_hash') if key == 'Icon' else None
+    icon_to_delete = None
+    if asset and delete_icon:
+        asset_path = Path(asset)
+        if _is_icon_eligible_for_deletion(asset_path, asset_hash, desktop_id, state):
+            icon_to_delete = asset_path
+
     fields_to_pop = [field, 'original_' + saved_key, 'original_' + saved_key + '_lines']
     if key == 'Icon':
         fields_to_pop.extend(['icon_path', 'icon_hash', 'theme_icon'])
@@ -597,35 +703,29 @@ def _revert(desktop_id: str, key: str) -> None:
     else:
         record['last_hash'] = _digest(text.encode())
         state[desktop_id] = record
-    if asset and not any(r.get('icon_path') == asset for r in state.values()):
-        asset_path = Path(asset)
-        if asset_hash and asset_path.is_file():
-            try:
-                if hashlib.sha256(asset_path.read_bytes()).hexdigest() == asset_hash:
-                    writes[asset_path] = None
-            except OSError:
-                pass
+    if icon_to_delete:
+        writes[icon_to_delete] = None
     _commit(state, writes)
     refresh_desktop_database()
 
 
 @operation
-def revert_icon(desktop_id: str) -> None:
-    _revert(desktop_id, 'Icon')
+def revert_icon(desktop_id: str, *, force: bool = False, delete_icon: bool = True) -> None:
+    _revert(desktop_id, 'Icon', force=force, delete_icon=delete_icon)
 
 
 @operation
-def revert_name(desktop_id: str) -> None:
-    _revert(desktop_id, 'Name')
+def revert_name(desktop_id: str, *, force: bool = False) -> None:
+    _revert(desktop_id, 'Name', force=force)
 
 
 @operation
-def revert_command(desktop_id: str) -> None:
-    _revert(desktop_id, 'Exec')
+def revert_command(desktop_id: str, *, force: bool = False) -> None:
+    _revert(desktop_id, 'Exec', force=force)
 
 
 @operation
-def restore_stock_launcher(desktop_id: str) -> None:
+def restore_stock_launcher(desktop_id: str, *, force: bool = False, delete_icon: bool = True) -> None:
     _id(desktop_id)
     if not find_stock(desktop_id):
         raise OverrideError('No stock launcher exists. This local-only application was left unchanged.')
@@ -648,22 +748,58 @@ def restore_stock_launcher(desktop_id: str) -> None:
     current = _read(local, MAX_DESKTOP_BYTES)
     expected_hash = record.get('last_hash', '')
     if not expected_hash or _digest(current) != expected_hash:
-        raise OverrideError(
-            'The local launcher is not the unchanged copy recorded by Glyph. '
-            'It was left in place to preserve your changes.')
+        if not force:
+            raise LauncherModifiedExternallyError(
+                'The local launcher is not the unchanged copy recorded by Glyph. '
+                'It was left in place to preserve your changes.',
+                desktop_id=desktop_id,
+            )
 
     writes: dict[Path, bytes | None] = {local: None}
-    record = state.pop(desktop_id)
-    asset = record.get('icon_path')
-    asset_hash = record.get('icon_hash')
-    if asset and not any(r.get('icon_path') == asset for r in state.values()):
-        asset_path = Path(asset)
-        if asset_hash and asset_path.is_file():
-            try:
-                if hashlib.sha256(asset_path.read_bytes()).hexdigest() == asset_hash:
-                    writes[asset_path] = None
-            except OSError:
-                pass
+    if delete_icon:
+        eligible, asset_path, _ = check_managed_icon_deletion(desktop_id, state)
+        if eligible and asset_path:
+            writes[asset_path] = None
+    state.pop(desktop_id)
+    _commit(state, writes)
+    refresh_desktop_database()
+
+
+@operation
+def discard_override(desktop_id: str, *, delete_icon: bool = True) -> None:
+    """Discard Glyph's tracked overrides for a desktop entry without altering unrelated lines."""
+    _id(desktop_id)
+    state = load_state()
+    record = state.pop(desktop_id, None)
+    if not record:
+        return
+    writes: dict[Path, bytes | None] = {}
+    if delete_icon:
+        temp_state = {desktop_id: record, **state}
+        eligible, asset_path, _ = check_managed_icon_deletion(desktop_id, temp_state)
+        if eligible and asset_path:
+            writes[asset_path] = None
+            local_str = record.get('local_desktop')
+            local = Path(local_str) if local_str else None
+            if local and local.is_file():
+                try:
+                    text = _read(local, MAX_DESKTOP_BYTES).decode('utf-8')
+                    if get_icon_value(text) == str(asset_path):
+                        stock_icon = ""
+                        stock_path = find_stock(desktop_id)
+                        if stock_path and Path(stock_path).is_file():
+                            try:
+                                stock_text = _read(Path(stock_path), MAX_DESKTOP_BYTES).decode('utf-8')
+                                stock_icon = get_icon_value(stock_text)
+                            except Exception:
+                                stock_icon = ""
+                        if not stock_icon:
+                            stock_icon = record.get('original_icon', '')
+                        if stock_icon and stock_icon != str(asset_path):
+                            new_text = set_icon_value(text, stock_icon)
+                            writes[local] = new_text.encode('utf-8')
+                except Exception:
+                    pass
     _commit(state, writes)
     refresh_desktop_database()
 

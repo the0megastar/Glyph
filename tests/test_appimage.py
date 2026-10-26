@@ -522,6 +522,101 @@ class TestAppImageIntegration(unittest.TestCase):
         names = [c.display_name for c in candidates]
         self.assertEqual(names, ["alpha", "Beta", "Zeta"])
 
+    def test_registration_custom_icon_validation_fails_before_binary_copy(self):
+        source = self.create_fake_appimage("InvalidIcon.AppImage")
+        invalid_icon = self.root / "corrupt.png"
+        invalid_icon.write_bytes(b"not a valid png file")
+
+        plan = plan_appimage_registration(source)
+        with self.assertRaises(AppImageError):
+            register_appimage(plan, "Invalid Icon App", custom_icon_path=str(invalid_icon))
+
+        # Binary was never copied to ~/Applications
+        self.assertFalse(plan.managed_file.exists())
+        # Source file is preserved untouched
+        self.assertTrue(source.is_file())
+        # No launcher was created
+        self.assertFalse((self.desktop_apps / plan.desktop_id).exists())
+        # State was not altered
+        self.assertNotIn(plan.desktop_id, overrides.load_state())
+
+    def test_registration_state_loading_fails_before_binary_copy(self):
+        source = self.create_fake_appimage("StateFail.AppImage")
+        plan = plan_appimage_registration(source)
+
+        with patch("glyph.appimage.load_state", side_effect=overrides.OverrideError("corrupted state")):
+            with self.assertRaises(overrides.OverrideError):
+                register_appimage(plan, "State Fail App")
+
+        # Binary was never copied to ~/Applications
+        self.assertFalse(plan.managed_file.exists())
+        self.assertTrue(source.is_file())
+
+    def test_registration_serialization_fails_before_binary_copy(self):
+        source = self.create_fake_appimage("SerialFail.AppImage")
+        plan = plan_appimage_registration(source)
+
+        with patch("gi.repository.GLib.KeyFile.to_data", side_effect=Exception("KeyFile serialization error")):
+            with self.assertRaises(AppImageError):
+                register_appimage(plan, "Serial Fail App")
+
+        # Binary was never copied to ~/Applications
+        self.assertFalse(plan.managed_file.exists())
+        self.assertTrue(source.is_file())
+
+    def test_registration_commit_fails_cleans_up_managed_binary(self):
+        source = self.create_fake_appimage("CommitFail.AppImage")
+        plan = plan_appimage_registration(source)
+
+        with patch("glyph.appimage._commit", side_effect=overrides.OverrideError("commit disk error")):
+            with self.assertRaises(overrides.OverrideError):
+                register_appimage(plan, "Commit Fail App")
+
+        # Newly created managed copy in ~/Applications was cleaned up
+        self.assertFalse(plan.managed_file.exists(), "Managed copy must be removed on commit failure")
+        # Source file is preserved untouched
+        self.assertTrue(source.is_file())
+        # No launcher exists
+        self.assertFalse((self.desktop_apps / plan.desktop_id).exists())
+        # State was not altered
+        self.assertNotIn(plan.desktop_id, overrides.load_state())
+
+    def test_inplace_registration_chmod_failure(self):
+        inplace_source = self.create_fake_appimage("InPlaceFail.AppImage", dir_path=self.user_apps)
+        plan = plan_appimage_registration(inplace_source)
+        self.assertTrue(plan.is_in_place)
+
+        with patch("os.chmod", side_effect=OSError("Permission denied")):
+            with self.assertRaisesRegex(AppImageError, "Failed to make AppImage executable"):
+                register_appimage(plan, "In-Place Fail App")
+
+        # Source file was not removed
+        self.assertTrue(inplace_source.is_file())
+        # No launcher was created
+        self.assertFalse((self.desktop_apps / plan.desktop_id).exists())
+        # State was not altered
+        self.assertNotIn(plan.desktop_id, overrides.load_state())
+
+    def test_unregister_with_keep_artwork_preserves_icon(self):
+        source = self.create_fake_appimage("KeepIcon.AppImage")
+        custom_icon = self.root / "keep.png"
+        custom_icon.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x55" * 64)
+
+        plan = plan_appimage_registration(source)
+        desktop_id = register_appimage(plan, "Keep Icon App", custom_icon_path=str(custom_icon))
+
+        state = overrides.load_state()
+        icon_path = Path(state[desktop_id]["icon_path"])
+        self.assertTrue(icon_path.is_file())
+
+        res = unregister_appimage(desktop_id, delete_icon=False)
+        self.assertFalse(res.get("icon_skipped"))
+        # Kept icon remains in ICONS_DIR
+        self.assertTrue(icon_path.is_file())
+        # Launcher and state are removed
+        self.assertFalse((self.desktop_apps / desktop_id).is_file())
+        self.assertNotIn(desktop_id, overrides.load_state())
+
 
 if __name__ == "__main__":
     unittest.main()

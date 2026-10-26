@@ -15,9 +15,15 @@ import glyph.overrides as ov
 from glyph.overrides import (
     BatchResult,
     BackupPlan,
+    LauncherModifiedExternallyError,
     OverrideError,
+    apply_command,
     apply_icon,
     apply_name,
+    apply_theme_icon,
+    can_delete_managed_icon,
+    check_managed_icon_deletion,
+    discard_override,
     export_backup,
     import_backup,
     load_state,
@@ -26,6 +32,7 @@ from glyph.overrides import (
     restore_stock_launcher,
     revert_all_icons,
     revert_all_names,
+    revert_command,
     revert_icon,
     revert_name,
     save_state,
@@ -562,6 +569,309 @@ class TestOverrides(unittest.TestCase):
         # Subsequent operations must succeed and not be blocked
         apply_name(p.name, str(p), "Succeed Name")
         self.assertEqual(load_state()[p.name]["custom_name"], "Succeed Name")
+
+    def test_external_modification_raises_launcher_modified_externally_error(self):
+        p = self.app_dir / "external_test.desktop"
+        p.write_text("[Desktop Entry]\nType=Application\nName=External\nIcon=stock-icon\n", encoding="utf-8")
+        apply_icon("external_test.desktop", str(p), str(self.sample_png))
+        self.assertIn("external_test.desktop", load_state())
+
+        # Simulate external edit (e.g. app update or integrator)
+        p.write_text("[Desktop Entry]\nType=Application\nName=External Updated\nIcon=stock-icon\n", encoding="utf-8")
+
+        with self.assertRaises(LauncherModifiedExternallyError) as ctx:
+            apply_icon("external_test.desktop", str(p), str(self.sample_png))
+        self.assertEqual(ctx.exception.desktop_id, "external_test.desktop")
+
+        with self.assertRaises(LauncherModifiedExternallyError) as ctx:
+            revert_icon("external_test.desktop")
+        self.assertEqual(ctx.exception.desktop_id, "external_test.desktop")
+
+        with self.assertRaises(LauncherModifiedExternallyError) as ctx:
+            apply_name("external_test.desktop", str(p), "New Name")
+        self.assertEqual(ctx.exception.desktop_id, "external_test.desktop")
+
+    def test_external_modification_force_apply_succeeds_and_updates_hash(self):
+        p = self.app_dir / "external_force.desktop"
+        p.write_text("[Desktop Entry]\nType=Application\nName=ForceApp\nIcon=stock-icon\n", encoding="utf-8")
+        apply_icon("external_force.desktop", str(p), str(self.sample_png))
+
+        # External modification
+        p.write_text("[Desktop Entry]\nType=Application\nName=ForceApp Updated\nIcon=stock-icon\n", encoding="utf-8")
+
+        # Force apply icon
+        apply_icon("external_force.desktop", str(p), str(self.sample_png), force=True)
+        state = load_state()
+        self.assertIn("external_force.desktop", state)
+        current_hash = ov._digest(p.read_bytes())
+        self.assertEqual(state["external_force.desktop"]["last_hash"], current_hash)
+
+    def test_discard_override_removes_state_and_cleans_icon_asset(self):
+        p = self.app_dir / "discard_test.desktop"
+        p.write_text("[Desktop Entry]\nType=Application\nName=DiscardApp\nIcon=stock-icon\n", encoding="utf-8")
+        apply_icon("discard_test.desktop", str(p), str(self.sample_png))
+
+        state = load_state()
+        icon_path = Path(state["discard_test.desktop"]["icon_path"])
+        self.assertTrue(icon_path.exists())
+
+        # Modify launcher externally
+        p.write_text("[Desktop Entry]\nType=Application\nName=DiscardApp External\nIcon=stock-icon\n", encoding="utf-8")
+
+        # Discard override with delete_icon=True (default)
+        discard_override("discard_test.desktop", delete_icon=True)
+        self.assertNotIn("discard_test.desktop", load_state())
+        self.assertFalse(icon_path.exists(), "Unreferenced custom icon should be unlinked")
+        self.assertEqual(p.read_text(encoding="utf-8"), "[Desktop Entry]\nType=Application\nName=DiscardApp External\nIcon=stock-icon\n")
+
+    def test_conflict_force_rebase_preserves_other_overrides_and_external_keys(self):
+        # 1. Start with custom name, icon, and command values
+        p = self.app_dir / "conflict_app.desktop"
+        p.write_text(
+            "[Desktop Entry]\nType=Application\nName=Stock Name\nExec=/usr/bin/stock\nIcon=stock-icon\nCategories=Utility;\n",
+            encoding="utf-8",
+        )
+        apply_name("conflict_app.desktop", str(p), "Custom Name")
+        apply_command("conflict_app.desktop", str(p), "custom-exec --flag")
+        apply_icon("conflict_app.desktop", str(p), str(self.sample_png))
+
+        state = load_state()["conflict_app.desktop"]
+        saved_icon = state["icon_path"]
+        self.assertEqual(state["custom_name"], "Custom Name")
+        self.assertEqual(state["custom_command"], "custom-exec --flag")
+
+        # 2. External edit changes Name, Exec, Icon lines, and adds unrelated lines/keys
+        p.write_text(
+            "[Desktop Entry]\n"
+            "Type=Application\n"
+            "Name=External Update\n"
+            "Exec=/usr/bin/external-updated\n"
+            "Icon=external-icon\n"
+            "Comment=External integrator comment\n"
+            "X-App-Release=1.2.3\n"
+            "Categories=Utility;System;\n",
+            encoding="utf-8",
+        )
+
+        # 3. Without force, modifying or reverting raises LauncherModifiedExternallyError
+        with self.assertRaises(LauncherModifiedExternallyError):
+            apply_icon("conflict_app.desktop", str(p), str(self.sample_png), force=False)
+
+        # 4. Force apply icon (e.g. user accepted Overwrite on icon change)
+        new_png = self.root / "new_icon.png"
+        new_png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x55" * 64)
+        apply_icon("conflict_app.desktop", str(p), str(new_png), force=True)
+
+        content = p.read_text(encoding="utf-8")
+        # Requested new icon is present
+        new_state = load_state()["conflict_app.desktop"]
+        self.assertIn(f"Icon={new_state['icon_path']}", content)
+        # Saved custom name and custom command are preserved
+        self.assertIn("Name=Custom Name", content)
+        self.assertIn("Exec=custom-exec --flag", content)
+        # Unrelated external fields survive the rebase
+        self.assertIn("Comment=External integrator comment", content)
+        self.assertIn("X-App-Release=1.2.3", content)
+        self.assertIn("Categories=Utility;System;", content)
+        # last_hash matches the final file bytes on disk
+        self.assertEqual(new_state["last_hash"], ov._digest(p.read_bytes()))
+
+        # 5. External edit again
+        p.write_text(
+            p.read_text(encoding="utf-8") + "X-Another-Key=PreservedValue\n",
+            encoding="utf-8",
+        )
+
+        # Force apply name: retains custom icon and custom command
+        apply_name("conflict_app.desktop", str(p), "Brand New Name", force=True)
+        content2 = p.read_text(encoding="utf-8")
+        self.assertIn("Name=Brand New Name", content2)
+        self.assertIn(f"Icon={new_state['icon_path']}", content2)
+        self.assertIn("Exec=custom-exec --flag", content2)
+        self.assertIn("X-Another-Key=PreservedValue", content2)
+
+        # Force apply command: retains custom icon and custom name
+        apply_command("conflict_app.desktop", str(p), "brand-new-cmd", force=True)
+        content3 = p.read_text(encoding="utf-8")
+        self.assertIn("Exec=brand-new-cmd", content3)
+        self.assertIn("Name=Brand New Name", content3)
+        self.assertIn(f"Icon={new_state['icon_path']}", content3)
+
+    def test_discard_with_keep_and_delete_image_preserves_usable_launcher(self):
+        p = self.app_dir / "usable_app.desktop"
+        p.write_text("[Desktop Entry]\nType=Application\nName=Stock App\nIcon=stock-icon\n", encoding="utf-8")
+        apply_icon("usable_app.desktop", str(p), str(self.sample_png))
+
+        state = load_state()
+        icon_path = Path(state["usable_app.desktop"]["icon_path"])
+        self.assertTrue(icon_path.is_file())
+
+        # Externally edit only the launcher's name
+        p.write_text(f"[Desktop Entry]\nType=Application\nName=Stock App Edited\nIcon={icon_path}\n", encoding="utf-8")
+
+        # Discard with keep (delete_icon=False)
+        discard_override("usable_app.desktop", delete_icon=False)
+        self.assertNotIn("usable_app.desktop", load_state())
+        # Kept image remains in ICONS_DIR
+        self.assertTrue(icon_path.is_file())
+        # Launcher is untouched on discard when image is kept
+        text_kept = p.read_text(encoding="utf-8")
+        self.assertIn("Name=Stock App Edited", text_kept)
+        self.assertIn(f"Icon={icon_path}", text_kept)
+
+        # Re-setup stock launcher, apply icon and edit externally again to test delete_icon=True
+        p.write_text("[Desktop Entry]\nType=Application\nName=Stock App\nIcon=stock-icon\n", encoding="utf-8")
+        apply_icon("usable_app.desktop", str(p), str(self.sample_png))
+        icon_path2 = Path(load_state()["usable_app.desktop"]["icon_path"])
+        p.write_text(f"[Desktop Entry]\nType=Application\nName=Stock App Edited 2\nIcon={icon_path2}\n", encoding="utf-8")
+
+        # Discard with delete (delete_icon=True)
+        discard_override("usable_app.desktop", delete_icon=True)
+        self.assertNotIn("usable_app.desktop", load_state())
+        # Image is deleted
+        self.assertFalse(icon_path2.exists())
+        # Launcher Icon key was updated to original/stock icon; does not point to deleted file
+        text_deleted = p.read_text(encoding="utf-8")
+        self.assertIn("Name=Stock App Edited 2", text_deleted)
+        self.assertNotIn(str(icon_path2), text_deleted)
+        self.assertIn("Icon=stock-icon", text_deleted)
+
+    def test_keep_vs_delete_artwork_on_replace_theme_switch_and_revert(self):
+        p = self.app_dir / "artwork_app.desktop"
+        p.write_text("[Desktop Entry]\nType=Application\nName=Art App\nIcon=stock-art\n", encoding="utf-8")
+        apply_icon("artwork_app.desktop", str(p), str(self.sample_png))
+        icon_v1 = Path(load_state()["artwork_app.desktop"]["icon_path"])
+        self.assertTrue(icon_v1.is_file())
+
+        # 1. Replace with delete_icon=False: keeps icon_v1
+        icon2_file = self.root / "art2.png"
+        icon2_file.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x66" * 64)
+        apply_icon("artwork_app.desktop", str(p), str(icon2_file), delete_icon=False)
+        icon_v2 = Path(load_state()["artwork_app.desktop"]["icon_path"])
+        self.assertTrue(icon_v1.exists(), "Kept artwork must remain available in icon storage")
+        self.assertTrue(icon_v2.exists())
+
+        # 2. Replace with delete_icon=True: deletes icon_v2
+        icon3_file = self.root / "art3.png"
+        icon3_file.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x77" * 64)
+        apply_icon("artwork_app.desktop", str(p), str(icon3_file), delete_icon=True)
+        icon_v3 = Path(load_state()["artwork_app.desktop"]["icon_path"])
+        self.assertFalse(icon_v2.exists(), "Deleted artwork must be removed")
+        self.assertTrue(icon_v3.exists())
+
+        # 3. Switch to theme icon with delete_icon=False: keeps icon_v3
+        apply_theme_icon("artwork_app.desktop", str(p), "system-file-manager", delete_icon=False)
+        self.assertTrue(icon_v3.exists(), "Theme switch with keep must preserve previous artwork")
+        self.assertNotIn("icon_path", load_state()["artwork_app.desktop"])
+        self.assertEqual(load_state()["artwork_app.desktop"]["theme_icon"], "system-file-manager")
+
+        # 4. Apply file icon then switch to theme icon with delete_icon=True: deletes icon
+        apply_icon("artwork_app.desktop", str(p), str(icon3_file))
+        icon_v4 = Path(load_state()["artwork_app.desktop"]["icon_path"])
+        self.assertTrue(icon_v4.exists())
+        apply_theme_icon("artwork_app.desktop", str(p), "utilities-terminal", delete_icon=True)
+        self.assertFalse(icon_v4.exists(), "Theme switch with delete must remove prior artwork")
+
+        # 5. Revert icon with keep vs delete
+        apply_icon("artwork_app.desktop", str(p), str(self.sample_png))
+        icon_v5 = Path(load_state()["artwork_app.desktop"]["icon_path"])
+        self.assertTrue(icon_v5.exists())
+        revert_icon("artwork_app.desktop", delete_icon=False)
+        self.assertTrue(icon_v5.exists(), "Revert icon with keep preserves artwork file")
+
+        apply_icon("artwork_app.desktop", str(p), str(self.sample_png))
+        icon_v6 = Path(load_state()["artwork_app.desktop"]["icon_path"])
+        revert_icon("artwork_app.desktop", delete_icon=True)
+        self.assertFalse(icon_v6.exists(), "Revert icon with delete removes artwork file")
+
+    def test_shared_and_externally_modified_icons_are_never_deleted(self):
+        p1 = self.app_dir / "app_share1.desktop"
+        p2 = self.app_dir / "app_share2.desktop"
+        p1.write_text("[Desktop Entry]\nName=Share1\nIcon=stock1\n", encoding="utf-8")
+        p2.write_text("[Desktop Entry]\nName=Share2\nIcon=stock2\n", encoding="utf-8")
+
+        apply_icon("app_share1.desktop", str(p1), str(self.sample_png))
+        state = load_state()
+        shared_icon = Path(state["app_share1.desktop"]["icon_path"])
+
+        # Share the identical icon path in state with app 2
+        p2.write_text(f"[Desktop Entry]\nName=Share2\nIcon={shared_icon}\n", encoding="utf-8")
+        state["app_share2.desktop"] = {
+            "local_desktop": str(p2),
+            "icon_path": str(shared_icon),
+            "icon_hash": state["app_share1.desktop"]["icon_hash"],
+            "original_icon": "stock2",
+            "last_hash": ov._digest(p2.read_bytes()),
+        }
+        ov.save_state(state)
+
+        # Both apps reference the identical image file in ICONS_DIR
+        state = load_state()
+        self.assertEqual(state["app_share1.desktop"]["icon_path"], state["app_share2.desktop"]["icon_path"])
+        self.assertFalse(can_delete_managed_icon("app_share1.desktop"))
+        eligible, _, reason = check_managed_icon_deletion("app_share1.desktop")
+        self.assertFalse(eligible)
+        self.assertEqual(reason, "shared")
+
+        # Discard app 1 with delete_icon=True: must NOT delete shared icon
+        discard_override("app_share1.desktop", delete_icon=True)
+        self.assertTrue(shared_icon.exists(), "Shared icon must not be deleted while still referenced by app 2")
+
+        # Externally modify the icon file so its hash no longer matches
+        shared_icon.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\xff" * 64)
+        self.assertFalse(can_delete_managed_icon("app_share2.desktop"))
+        eligible, _, reason = check_managed_icon_deletion("app_share2.desktop")
+        self.assertFalse(eligible)
+        self.assertEqual(reason, "modified")
+
+        # Reverting app 2 with delete_icon=True must preserve the modified icon
+        revert_icon("app_share2.desktop", delete_icon=True)
+        self.assertTrue(shared_icon.exists(), "Externally modified icon must be preserved")
+
+    def test_backup_command_coverage_and_omitted_counts(self):
+        p_cmd = self.app_dir / "cmd_only.desktop"
+        p_cmd.write_text("[Desktop Entry]\nName=CmdApp\nExec=/bin/true\nIcon=cmd\n", encoding="utf-8")
+        apply_command("cmd_only.desktop", str(p_cmd), "custom-cmd-flag")
+
+        tar_cmd_only = self.root / "cmd_only_backup.tar.gz"
+        res1 = export_backup(tar_cmd_only)
+        self.assertEqual(res1.exported, 0)
+        self.assertEqual(res1.omitted, 1)
+        self.assertEqual(res1.command_only, 1)
+        self.assertEqual(res1.mixed, 0)
+        self.assertEqual(int(res1), 0)
+
+        # Mix of name, icon, and command customizations
+        p_mix = self.app_dir / "mix.desktop"
+        p_mix.write_text("[Desktop Entry]\nName=MixApp\nExec=/bin/true\nIcon=mix\n", encoding="utf-8")
+        apply_name("mix.desktop", str(p_mix), "Mix Custom")
+        apply_icon("mix.desktop", str(p_mix), str(self.sample_png))
+        apply_command("mix.desktop", str(p_mix), "mix-exec")
+
+        p_name = self.app_dir / "name_only.desktop"
+        p_name.write_text("[Desktop Entry]\nName=NameOnly\nExec=/bin/true\nIcon=name\n", encoding="utf-8")
+        apply_name("name_only.desktop", str(p_name), "Name Only Custom")
+
+        tar_mix = self.root / "mix_backup.tar.gz"
+        res2 = export_backup(tar_mix)
+        self.assertEqual(res2.exported, 2)  # mix.desktop and name_only.desktop
+        self.assertEqual(res2.omitted, 2)   # mix.desktop (mixed) and cmd_only.desktop (command-only)
+        self.assertEqual(res2.command_only, 1)
+        self.assertEqual(res2.mixed, 1)
+        self.assertEqual(int(res2), 2)
+
+        # Verify archive manifest excludes commands
+        with tarfile.open(tar_mix, "r:gz") as tar:
+            manifest_file = tar.extractfile("manifest.json")
+            self.assertIsNotNone(manifest_file)
+            manifest = json.loads(manifest_file.read().decode("utf-8"))
+            self.assertEqual(manifest["version"], 2)
+            self.assertIn("mix.desktop", manifest["entries"])
+            self.assertIn("name_only.desktop", manifest["entries"])
+            self.assertNotIn("cmd_only.desktop", manifest["entries"])
+            # Entries contain only name and icon
+            for entry in manifest["entries"].values():
+                self.assertTrue(set(entry.keys()).issubset({"name", "icon"}))
 
 
 if __name__ == "__main__":
