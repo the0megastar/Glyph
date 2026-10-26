@@ -873,6 +873,184 @@ class TestOverrides(unittest.TestCase):
             for entry in manifest["entries"].values():
                 self.assertTrue(set(entry.keys()).issubset({"name", "icon"}))
 
+    def test_force_apply_rebases_saved_originals_for_reset(self):
+        p = self.app_dir / "rebase_app.desktop"
+        p.write_text("[Desktop Entry]\nName=Baseline App\nExec=baseline-exec\nIcon=baseline-icon\nType=Application\n", encoding="utf-8")
+
+        # Set up custom name, icon, and command
+        apply_name("rebase_app.desktop", str(p), "My Custom Name")
+        apply_command("rebase_app.desktop", str(p), "my-custom-exec")
+        apply_icon("rebase_app.desktop", str(p), str(self.sample_png))
+        icon_v1 = Path(load_state()["rebase_app.desktop"]["icon_path"])
+
+        # Externally update all three fields and add an unrelated key
+        p.write_text(
+            f"[Desktop Entry]\nName=Upstream Name\nExec=upstream-exec\nIcon=upstream-icon\nType=Application\nX-Vendor-Custom=PreserveMe\n",
+            encoding="utf-8"
+        )
+
+        # Force-apply a new icon
+        icon2_file = self.root / "new_art.png"
+        icon2_file.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x99" * 64)
+        apply_icon("rebase_app.desktop", str(p), str(icon2_file), force=True)
+
+        state = load_state()["rebase_app.desktop"]
+        icon_v2 = Path(state["icon_path"])
+        text = p.read_text(encoding="utf-8")
+
+        # Other custom values remain active
+        self.assertIn("Name=My Custom Name", text)
+        self.assertIn("Exec=my-custom-exec", text)
+        self.assertIn(f"Icon={icon_v2}", text)
+        # Unrelated key survives
+        self.assertIn("X-Vendor-Custom=PreserveMe", text)
+        # Hash matches final written bytes
+        self.assertEqual(state["last_hash"], ov._digest(text.encode("utf-8")))
+
+        # Resetting each field restores its externally updated baseline
+        revert_name("rebase_app.desktop")
+        text_after_name = p.read_text(encoding="utf-8")
+        self.assertIn("Name=Upstream Name", text_after_name)
+        self.assertIn("Exec=my-custom-exec", text_after_name)
+
+        revert_command("rebase_app.desktop")
+        text_after_cmd = p.read_text(encoding="utf-8")
+        self.assertIn("Exec=upstream-exec", text_after_cmd)
+
+        revert_icon("rebase_app.desktop")
+        text_after_icon = p.read_text(encoding="utf-8")
+        self.assertIn("Icon=upstream-icon", text_after_icon)
+        self.assertIn("X-Vendor-Custom=PreserveMe", text_after_icon)
+
+    def test_force_revert_uses_current_external_baseline(self):
+        p = self.app_dir / "revert_rebase.desktop"
+        p.write_text("[Desktop Entry]\nName=Old Name\nExec=old-exec\nType=Application\n", encoding="utf-8")
+
+        apply_name("revert_rebase.desktop", str(p), "Custom Name")
+        apply_command("revert_rebase.desktop", str(p), "custom-exec")
+
+        # External edit changes name, command, and adds a key
+        p.write_text("[Desktop Entry]\nName=External Name 2\nExec=external-exec-2\nType=Application\nX-Keep=Yes\n", encoding="utf-8")
+
+        # Force revert name
+        revert_name("revert_rebase.desktop", force=True)
+        text = p.read_text(encoding="utf-8")
+
+        # Name restores to external baseline; command remains custom
+        self.assertIn("Name=External Name 2", text)
+        self.assertIn("Exec=custom-exec", text)
+        self.assertIn("X-Keep=Yes", text)
+        state = load_state()["revert_rebase.desktop"]
+        self.assertEqual(state["last_hash"], ov._digest(text.encode("utf-8")))
+
+        # Reverting command restores to external baseline
+        revert_command("revert_rebase.desktop")
+        text_final = p.read_text(encoding="utf-8")
+        self.assertIn("Exec=external-exec-2", text_final)
+
+    def test_discard_override_launcher_reference_and_transaction_handling(self):
+        # 1. Local launcher with NO original Icon key
+        p_no_icon = self.app_dir / "no_icon.desktop"
+        p_no_icon.write_text("[Desktop Entry]\nType=Application\nName=NoIconApp\nX-Other=True\n", encoding="utf-8")
+        apply_icon("no_icon.desktop", str(p_no_icon), str(self.sample_png))
+        icon1 = Path(load_state()["no_icon.desktop"]["icon_path"])
+        self.assertTrue(icon1.is_file())
+
+        # External edit leaves Icon pointed at managed icon, changes another key
+        p_no_icon.write_text(f"[Desktop Entry]\nType=Application\nName=NoIconApp Edited\nIcon={icon1}\nX-Other=Changed\n", encoding="utf-8")
+
+        res = discard_override("no_icon.desktop", delete_icon=True)
+        self.assertFalse(res["icon_skipped"])
+        self.assertFalse(icon1.exists(), "Managed icon must be deleted")
+        text_no_icon = p_no_icon.read_text(encoding="utf-8")
+        self.assertNotIn(str(icon1), text_no_icon)
+        self.assertNotIn("Icon=", text_no_icon, "Icon key should be removed when no fallback exists")
+        self.assertIn("Name=NoIconApp Edited", text_no_icon)
+        self.assertIn("X-Other=Changed", text_no_icon)
+
+        # 2. Launcher with stock fallback
+        p_stock = self.app_dir / "has_stock.desktop"
+        p_stock.write_text("[Desktop Entry]\nType=Application\nName=HasStock\nIcon=stock-ico\n", encoding="utf-8")
+        stock_file = self.stock_dir / "has_stock.desktop"
+        stock_file.write_text("[Desktop Entry]\nType=Application\nName=HasStock\nIcon=stock-ico\n", encoding="utf-8")
+
+        with patch("glyph.overrides.find_stock", return_value=str(stock_file)):
+            apply_icon("has_stock.desktop", str(p_stock), str(self.sample_png))
+            icon2 = Path(load_state()["has_stock.desktop"]["icon_path"])
+            p_stock.write_text(f"[Desktop Entry]\nType=Application\nName=HasStock Edited\nIcon={icon2}\n", encoding="utf-8")
+
+            res_stock = discard_override("has_stock.desktop", delete_icon=True)
+            self.assertFalse(res_stock["icon_skipped"])
+            self.assertFalse(icon2.exists())
+            text_stock = p_stock.read_text(encoding="utf-8")
+            self.assertIn("Icon=stock-ico", text_stock)
+
+        # 3. Simulate unreadable launcher on discard -> preserves image and reports skipped
+        p_unread = self.app_dir / "unread.desktop"
+        p_unread.write_text("[Desktop Entry]\nType=Application\nName=Unread\nIcon=original-icon\n", encoding="utf-8")
+        apply_icon("unread.desktop", str(p_unread), str(self.sample_png))
+        icon3 = Path(load_state()["unread.desktop"]["icon_path"])
+        p_unread.write_text(f"[Desktop Entry]\nType=Application\nName=Unread Edited\nIcon={icon3}\n", encoding="utf-8")
+
+        orig_read = ov._read
+        def read_fail_on_launcher(path, limit):
+            if path == p_unread:
+                raise PermissionError("Permission denied")
+            return orig_read(path, limit)
+
+        with patch.object(ov, "_read", side_effect=read_fail_on_launcher):
+            res_unread = discard_override("unread.desktop", delete_icon=True)
+            self.assertTrue(res_unread["icon_skipped"])
+            self.assertTrue(icon3.exists(), "Image must remain on disk if launcher rewrite fails")
+            self.assertNotIn("unread.desktop", load_state())
+
+        # 4. Keep choice removes tracking state without altering launcher or deleting image
+        p_keep = self.app_dir / "keep.desktop"
+        p_keep.write_text("[Desktop Entry]\nType=Application\nName=KeepApp\nIcon=orig-icon\n", encoding="utf-8")
+        apply_icon("keep.desktop", str(p_keep), str(self.sample_png))
+        icon4 = Path(load_state()["keep.desktop"]["icon_path"])
+        p_keep.write_text(f"[Desktop Entry]\nType=Application\nName=KeepApp Edited\nIcon={icon4}\n", encoding="utf-8")
+
+        res_keep = discard_override("keep.desktop", delete_icon=False)
+        self.assertFalse(res_keep["icon_skipped"])
+        self.assertTrue(icon4.exists())
+        self.assertIn(f"Icon={icon4}", p_keep.read_text(encoding="utf-8"))
+        self.assertNotIn("keep.desktop", load_state())
+
+    def test_bulk_icon_revert_and_stock_restore_with_delete_icon_option(self):
+        p1 = self.app_dir / "bulk1.desktop"
+        p1.write_text("[Desktop Entry]\nName=Bulk1\nIcon=b1\n", encoding="utf-8")
+        apply_icon("bulk1.desktop", str(p1), str(self.sample_png))
+        icon_bulk1 = Path(load_state()["bulk1.desktop"]["icon_path"])
+
+        # Revert all icons with delete_icon=False preserves file
+        res_keep = revert_all_icons(delete_icon=False)
+        self.assertEqual(res_keep.completed, 1)
+        self.assertTrue(icon_bulk1.exists())
+
+        # Re-apply and revert with delete_icon=True deletes file
+        apply_icon("bulk1.desktop", str(p1), str(self.sample_png))
+        icon_bulk2 = Path(load_state()["bulk1.desktop"]["icon_path"])
+        res_del = revert_all_icons(delete_icon=True)
+        self.assertEqual(res_del.completed, 1)
+        self.assertFalse(icon_bulk2.exists())
+
+        # Stock restore with delete_icon=False vs True
+        stock_file = self.stock_dir / "bulk_stock.desktop"
+        stock_file.write_text("[Desktop Entry]\nName=StockBulk\nIcon=stock-ico\n", encoding="utf-8")
+
+        with patch("glyph.overrides.find_stock", return_value=str(stock_file)):
+            apply_icon("bulk_stock.desktop", str(stock_file), str(self.sample_png))
+            icon_s1 = Path(load_state()["bulk_stock.desktop"]["icon_path"])
+            restore_all_to_stock(delete_icon=False)
+            self.assertTrue(icon_s1.exists())
+
+            # Re-apply and restore with delete_icon=True
+            apply_icon("bulk_stock.desktop", str(stock_file), str(self.sample_png))
+            icon_s2 = Path(load_state()["bulk_stock.desktop"]["icon_path"])
+            restore_all_to_stock(delete_icon=True)
+            self.assertFalse(icon_s2.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

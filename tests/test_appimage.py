@@ -610,12 +610,72 @@ class TestAppImageIntegration(unittest.TestCase):
         self.assertTrue(icon_path.is_file())
 
         res = unregister_appimage(desktop_id, delete_icon=False)
+        self.assertTrue(res.get("icon_kept"))
         self.assertFalse(res.get("icon_skipped"))
+        self.assertFalse(res.get("icon_deleted"))
         # Kept icon remains in ICONS_DIR
         self.assertTrue(icon_path.is_file())
         # Launcher and state are removed
         self.assertFalse((self.desktop_apps / desktop_id).is_file())
         self.assertNotIn(desktop_id, overrides.load_state())
+
+    def test_unregister_with_delete_artwork_reports_deleted_when_unshared(self):
+        source = self.create_fake_appimage("DelIcon.AppImage")
+        custom_icon = self.root / "del.png"
+        custom_icon.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x66" * 64)
+
+        plan = plan_appimage_registration(source)
+        desktop_id = register_appimage(plan, "Del Icon App", custom_icon_path=str(custom_icon))
+
+        res = unregister_appimage(desktop_id, delete_icon=True)
+        self.assertTrue(res.get("icon_deleted"))
+        self.assertFalse(res.get("icon_skipped"))
+        self.assertFalse(res.get("icon_kept"))
+        self.assertFalse((self.desktop_apps / desktop_id).is_file())
+
+    def test_unregister_reports_skipped_for_shared_and_modified_artwork(self):
+        source1 = self.create_fake_appimage("Shared1.AppImage")
+        custom_icon = self.root / "shared.png"
+        custom_icon.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x77" * 64)
+
+        plan1 = plan_appimage_registration(source1)
+        id1 = register_appimage(plan1, "Shared App 1", custom_icon_path=str(custom_icon))
+        state = overrides.load_state()
+        icon_path = Path(state[id1]["icon_path"])
+
+        # Manually point another state record to the same icon path to test sharing
+        state["other.desktop"] = {
+            "local_desktop": str(self.desktop_apps / "other.desktop"),
+            "icon_path": str(icon_path),
+            "icon_hash": state[id1]["icon_hash"],
+        }
+        overrides.save_state(state)
+
+        # Unregister id1 with delete_icon=True: should report skipped with reason "shared"
+        res_shared = unregister_appimage(id1, delete_icon=True)
+        self.assertTrue(res_shared.get("icon_skipped"))
+        self.assertEqual(res_shared.get("icon_skip_reason"), "shared")
+        self.assertFalse(res_shared.get("icon_deleted"))
+        self.assertTrue(icon_path.is_file(), "Shared artwork must be preserved")
+
+        # Now remove other.desktop so icon is no longer shared, but modify the icon file externally
+        state = overrides.load_state()
+        del state["other.desktop"]
+        overrides.save_state(state)
+
+        source2 = self.create_fake_appimage("ModIcon.AppImage")
+        plan2 = plan_appimage_registration(source2)
+        id2 = register_appimage(plan2, "Mod Icon App", custom_icon_path=str(custom_icon))
+        state = overrides.load_state()
+        icon_path2 = Path(state[id2]["icon_path"])
+
+        # Modify icon file externally
+        icon_path2.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x88" * 64)
+        res_mod = unregister_appimage(id2, delete_icon=True)
+        self.assertTrue(res_mod.get("icon_skipped"))
+        self.assertEqual(res_mod.get("icon_skip_reason"), "modified")
+        self.assertFalse(res_mod.get("icon_deleted"))
+        self.assertTrue(icon_path2.is_file(), "Modified artwork must be preserved")
 
 
 if __name__ == "__main__":

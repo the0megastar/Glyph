@@ -221,7 +221,7 @@ def preview_backup(source_path: Path) -> BackupPlan:
     return _preview()
 
 
-def import_backup(source_path: Path, *, replace_existing: bool = False) -> BatchResult:
+def import_backup(source_path: Path, *, replace_existing: bool = False, delete_icon: bool = True) -> BatchResult:
     from glyph import overrides
     from glyph.overrides import (
         BatchResult,
@@ -245,7 +245,9 @@ def import_backup(source_path: Path, *, replace_existing: bool = False) -> Batch
                 asset = entry.get('icon')
                 _apply(load_state(), desktop_id, plan.sources[desktop_id],
                        image=plan.assets[asset] if asset else None,
-                       suffix=PurePosixPath(asset).suffix if asset else None, name=entry.get('name'))
+                       suffix=PurePosixPath(asset).suffix if asset else None,
+                       name=entry.get('name'),
+                       delete_icon=delete_icon)
                 result.completed += 1
             except OverrideError as exc:
                 result.errors[desktop_id] = str(exc)

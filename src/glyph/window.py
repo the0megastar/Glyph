@@ -1010,12 +1010,15 @@ class GlyphWindow(Adw.ApplicationWindow):
 
         def do_discard(delete_icon: bool = False):
             try:
-                discard_override(app.desktop_id, delete_icon=delete_icon)
+                res = discard_override(app.desktop_id, delete_icon=delete_icon)
             except OverrideError as exc:
                 self._toast(str(exc))
                 return
             self.reload()
-            self._toast(f"Discarded overrides for {app.name}.")
+            if res and res.get("icon_skipped"):
+                self._toast(f"Discarded overrides for {app.name}. Custom artwork was preserved.")
+            else:
+                self._toast(f"Discarded overrides for {app.name}.")
 
         if can_delete_managed_icon(app.desktop_id):
             dialogs.prompt_artwork_cleanup(
@@ -1292,8 +1295,13 @@ class GlyphWindow(Adw.ApplicationWindow):
             self.nav.pop()
             self._detail_id = None
             self.reload()
-            if res and res.get("icon_skipped"):
-                self._toast(f"Unregistered launcher for {app.name}. Modified icon and binary file preserved.")
+            if res and res.get("icon_kept"):
+                self._toast(f"Unregistered launcher for {app.name}. Artwork and binary file preserved.")
+            elif res and res.get("icon_skipped"):
+                if res.get("icon_skip_reason") == "modified":
+                    self._toast(f"Unregistered launcher for {app.name}. Modified artwork and binary file preserved.")
+                else:
+                    self._toast(f"Unregistered launcher for {app.name}. Artwork and binary file preserved.")
             else:
                 self._toast(f"Unregistered launcher for {app.name}. Binary file preserved.")
 

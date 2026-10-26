@@ -63,9 +63,12 @@ def prompt_artwork_cleanup(
 def handle_discard(parent: Gtk.Widget | None, desktop_id: str, app_name: str) -> None:
     def do_discard(delete_icon: bool = False):
         try:
-            discard_override(desktop_id, delete_icon=delete_icon)
+            res = discard_override(desktop_id, delete_icon=delete_icon)
             _reload(parent)
-            _toast(parent, f"Discarded overrides for {app_name}.")
+            if res and res.get("icon_skipped"):
+                _toast(parent, f"Discarded overrides for {app_name}. Custom artwork was preserved.")
+            else:
+                _toast(parent, f"Discarded overrides for {app_name}.")
         except OverrideError as exc:
             _toast(parent, str(exc))
 
@@ -146,37 +149,57 @@ def confirm_revert_all_icons(parent: Gtk.Widget | None) -> None:
         _toast(parent, str(exc))
         return
 
-    count = sum(bool(record.get("icon_path")) for record in state.values())
+    count = sum(bool(record.get("icon_path") or record.get("theme_icon")) for record in state.values())
     if count == 0:
         _toast(parent, "No custom icons to revert.")
         return
 
-    dialog = Adw.AlertDialog(
-        heading="Revert all custom icons?",
-        body=(
-            f"This will restore original icons for {count} application{'s' if count != 1 else ''} "
-            "while preserving custom names and pre-existing launchers."
-        ),
-    )
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("revert", "Revert All")
-    dialog.set_response_appearance("revert", Adw.ResponseAppearance.DESTRUCTIVE)
+    eligible_count = sum(1 for k in state if can_delete_managed_icon(k, state))
 
-    def on_response(_d, response):
-        if response == "revert":
-            try:
-                res = revert_all_icons()
-            except OverrideError as exc:
-                _toast(parent, str(exc))
-                return
-            _reload(parent)
-            msg = f"Restored original icons for {res.completed} application{'s' if res.completed != 1 else ''}."
-            if res.errors:
-                msg += f" ({len(res.errors)} failed)"
-            _toast(parent, msg)
+    def do_revert(delete_icon: bool = False):
+        try:
+            res = revert_all_icons(delete_icon=delete_icon)
+        except OverrideError as exc:
+            _toast(parent, str(exc))
+            return
+        _reload(parent)
+        msg = f"Restored original icons for {res.completed} application{'s' if res.completed != 1 else ''}."
+        if res.errors:
+            msg += f" ({len(res.errors)} failed)"
+        _toast(parent, msg)
 
-    dialog.connect("response", on_response)
-    dialog.present(parent)
+    if eligible_count > 0:
+        prompt_artwork_cleanup(
+            parent,
+            "",
+            heading="Revert all custom icons?",
+            body=(
+                f"This will restore original icons for {count} application{'s' if count != 1 else ''}. "
+                f"Glyph has {eligible_count} saved custom image{'s' if eligible_count != 1 else ''} in icon storage. "
+                "Would you like to keep the images for later reuse, or delete them?"
+            ),
+            on_choice=do_revert,
+        )
+    else:
+        dialog = Adw.AlertDialog(
+            heading="Revert all custom icons?",
+            body=(
+                f"This will restore original icons for {count} application{'s' if count != 1 else ''} "
+                "while preserving custom names and pre-existing launchers."
+            ),
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("revert", "Revert All")
+        dialog.set_response_appearance("revert", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("revert")
+        dialog.set_close_response("cancel")
+
+        def on_response(_d, response):
+            if response == "revert":
+                do_revert(delete_icon=False)
+
+        dialog.connect("response", on_response)
+        dialog.present(parent)
 
 
 def confirm_revert_all_names(parent: Gtk.Widget | None) -> None:
@@ -220,36 +243,66 @@ def confirm_revert_all_names(parent: Gtk.Widget | None) -> None:
 
 
 def confirm_restore_all_stock(parent: Gtk.Widget | None) -> None:
-    dialog = Adw.AlertDialog(
-        heading="Restore all launchers to system default?",
-        body=(
-            "This will remove all local launcher overrides in your personal applications "
-            "folder and restore every app to its original stock name and icon as provided "
-            "by the package install.\n\n"
-            "Standalone user applications with no system package will not be affected.\n\n"
-            "Note: If you have a custom GNOME icon theme active (e.g. via GNOME Tweaks), "
-            "applications will display that theme's icons rather than the original vendor graphics."
-        ),
-    )
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("restore", "Restore All to Default")
-    dialog.set_response_appearance("restore", Adw.ResponseAppearance.DESTRUCTIVE)
+    try:
+        state = load_state()
+    except OverrideError as exc:
+        _toast(parent, str(exc))
+        return
 
-    def on_response(_d, response):
-        if response == "restore":
-            try:
-                res = restore_all_to_stock()
-            except OverrideError as exc:
-                _toast(parent, str(exc))
-                return
-            _reload(parent)
-            msg = f"Restored {res.completed} launcher{'s' if res.completed != 1 else ''} to system default."
-            if res.errors:
-                msg += f" ({len(res.errors)} failed)"
-            _toast(parent, msg)
+    from glyph.paths import desktop_index, find_stock
+    from glyph.overrides import APPLICATIONS_DIR
+    stock_ids = [k for k in desktop_index([APPLICATIONS_DIR]) if find_stock(k)]
+    eligible_count = sum(1 for k in stock_ids if can_delete_managed_icon(k, state))
 
-    dialog.connect("response", on_response)
-    dialog.present(parent)
+    def do_restore(delete_icon: bool = False):
+        try:
+            res = restore_all_to_stock(delete_icon=delete_icon)
+        except OverrideError as exc:
+            _toast(parent, str(exc))
+            return
+        _reload(parent)
+        msg = f"Restored {res.completed} launcher{'s' if res.completed != 1 else ''} to system default."
+        if res.errors:
+            msg += f" ({len(res.errors)} failed)"
+        _toast(parent, msg)
+
+    if eligible_count > 0:
+        prompt_artwork_cleanup(
+            parent,
+            "",
+            heading="Restore all launchers to system default?",
+            body=(
+                "This will remove all local launcher overrides in your personal applications folder "
+                "and restore every app to its original stock name and icon.\n\n"
+                f"Glyph has {eligible_count} saved custom image{'s' if eligible_count != 1 else ''} in icon storage. "
+                "Would you like to keep the images for later reuse, or delete them?"
+            ),
+            on_choice=do_restore,
+        )
+    else:
+        dialog = Adw.AlertDialog(
+            heading="Restore all launchers to system default?",
+            body=(
+                "This will remove all local launcher overrides in your personal applications "
+                "folder and restore every app to its original stock name and icon as provided "
+                "by the package install.\n\n"
+                "Standalone user applications with no system package will not be affected.\n\n"
+                "Note: If you have a custom GNOME icon theme active (e.g. via GNOME Tweaks), "
+                "applications will display that theme's icons rather than the original vendor graphics."
+            ),
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("restore", "Restore All to Default")
+        dialog.set_response_appearance("restore", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("restore")
+        dialog.set_close_response("cancel")
+
+        def on_response(_d, response):
+            if response == "restore":
+                do_restore(delete_icon=False)
+
+        dialog.connect("response", on_response)
+        dialog.present(parent)
 
 
 def export_overrides_dialog(parent: Gtk.Widget | None) -> None:
@@ -340,9 +393,9 @@ def handle_import_open_done(parent: Gtk.Widget | None, dlg: Gtk.FileDialog, resu
         _toast(parent, f"Invalid backup: {exc}")
         return
 
-    def execute_import(replace_existing: bool):
+    def execute_import(replace_existing: bool, delete_icon: bool = False):
         try:
-            res = import_backup(source_path, replace_existing=replace_existing)
+            res = import_backup(source_path, replace_existing=replace_existing, delete_icon=delete_icon)
             _reload(parent)
             msg = f"Restored {res.completed} customization{'s' if res.completed != 1 else ''}."
             if res.skipped:
@@ -352,6 +405,33 @@ def handle_import_open_done(parent: Gtk.Widget | None, dlg: Gtk.FileDialog, resu
             _toast(parent, msg)
         except Exception as exc:
             _toast(parent, f"Import failed: {exc}")
+
+    try:
+        current = load_state()
+    except Exception:
+        current = {}
+
+    replacing_managed_icons = [
+        k for k in plan.conflicts
+        if k in plan.entries and plan.entries[k].get("icon") and can_delete_managed_icon(k, current)
+    ]
+
+    def prompt_artwork_for_import(replace_existing: bool):
+        if replace_existing and replacing_managed_icons:
+            count = len(replacing_managed_icons)
+            prompt_artwork_cleanup(
+                parent,
+                "",
+                heading="Replace saved artwork?",
+                body=(
+                    f"This backup contains new icons for {count} application{'s' if count != 1 else ''} "
+                    "with saved artwork in icon storage. Would you like to keep your existing artwork "
+                    "in storage for later reuse, or delete it?"
+                ),
+                on_choice=lambda delete: execute_import(replace_existing=True, delete_icon=delete),
+            )
+        else:
+            execute_import(replace_existing=replace_existing, delete_icon=False)
 
     if plan.conflicts:
         confirm = Adw.AlertDialog(
@@ -368,14 +448,14 @@ def handle_import_open_done(parent: Gtk.Widget | None, dlg: Gtk.FileDialog, resu
 
         def on_conflict_response(_d, resp):
             if resp == "overwrite":
-                execute_import(replace_existing=True)
+                prompt_artwork_for_import(replace_existing=True)
             elif resp == "skip":
-                execute_import(replace_existing=False)
+                prompt_artwork_for_import(replace_existing=False)
 
         confirm.connect("response", on_conflict_response)
         confirm.present(parent)
     else:
-        execute_import(replace_existing=False)
+        execute_import(replace_existing=False, delete_icon=False)
 
 
 def import_overrides_dialog(parent: Gtk.Widget | None) -> None:

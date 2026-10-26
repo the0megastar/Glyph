@@ -547,6 +547,164 @@ class TestUI(unittest.TestCase):
             cb(alert2, "restore")
             mock_restore.assert_called_once_with("stock.desktop", force=False, delete_icon=False)
 
+    def test_confirm_revert_all_icons_artwork_prompt(self):
+        parent = MagicMock()
+        state = {"app1.desktop": {"icon_path": "/path/1.png"}}
+
+        # Case 1: eligible_count > 0 -> prompts keep/delete artwork
+        with patch("glyph.dialogs.load_state", return_value=state), \
+             patch("glyph.dialogs.can_delete_managed_icon", return_value=True), \
+             patch("glyph.dialogs.prompt_artwork_cleanup") as mock_prompt, \
+             patch("glyph.dialogs.revert_all_icons") as mock_revert:
+            dialogs.confirm_revert_all_icons(parent)
+            mock_prompt.assert_called_once()
+            on_choice = mock_prompt.call_args.kwargs["on_choice"]
+
+            on_choice(delete_icon=True)
+            mock_revert.assert_called_once_with(delete_icon=True)
+
+        # Case 2: eligible_count == 0 -> standard dialog
+        alert = MagicMock()
+        with patch("glyph.dialogs.load_state", return_value=state), \
+             patch("glyph.dialogs.can_delete_managed_icon", return_value=False), \
+             patch.object(dialogs.Adw, "AlertDialog", return_value=alert), \
+             patch("glyph.dialogs.revert_all_icons") as mock_revert:
+            dialogs.confirm_revert_all_icons(parent)
+            alert.present.assert_called_once_with(parent)
+            cb = alert.connect.call_args.args[1]
+            cb(alert, "revert")
+            mock_revert.assert_called_once_with(delete_icon=False)
+
+    def test_confirm_restore_all_stock_artwork_prompt(self):
+        parent = MagicMock()
+        state = {"stock.desktop": {"icon_path": "/path/stock.png"}}
+
+        # Case 1: eligible_count > 0 -> prompts keep/delete artwork
+        with patch("glyph.dialogs.load_state", return_value=state), \
+             patch("glyph.paths.desktop_index", return_value={"stock.desktop": Path("/path")}), \
+             patch("glyph.paths.find_stock", return_value="/stock/path"), \
+             patch("glyph.dialogs.can_delete_managed_icon", return_value=True), \
+             patch("glyph.dialogs.prompt_artwork_cleanup") as mock_prompt, \
+             patch("glyph.dialogs.restore_all_to_stock") as mock_restore:
+            dialogs.confirm_restore_all_stock(parent)
+            mock_prompt.assert_called_once()
+            on_choice = mock_prompt.call_args.kwargs["on_choice"]
+
+            on_choice(delete_icon=False)
+            mock_restore.assert_called_once_with(delete_icon=False)
+
+        # Case 2: eligible_count == 0 -> standard dialog
+        alert = MagicMock()
+        with patch("glyph.dialogs.load_state", return_value=state), \
+             patch("glyph.paths.desktop_index", return_value={"stock.desktop": Path("/path")}), \
+             patch("glyph.paths.find_stock", return_value="/stock/path"), \
+             patch("glyph.dialogs.can_delete_managed_icon", return_value=False), \
+             patch.object(dialogs.Adw, "AlertDialog", return_value=alert), \
+             patch("glyph.dialogs.restore_all_to_stock") as mock_restore:
+            dialogs.confirm_restore_all_stock(parent)
+            alert.present.assert_called_once_with(parent)
+            cb = alert.connect.call_args.args[1]
+            cb(alert, "restore")
+            mock_restore.assert_called_once_with(delete_icon=False)
+
+    def test_handle_import_open_done_artwork_prompt_when_replacing_icons(self):
+        parent = MagicMock()
+        dlg = MagicMock()
+        fake_file = MagicMock()
+        fake_file.get_path.return_value = "/backup.tar.gz"
+        dlg.open_finish.return_value = fake_file
+
+        # Plan with conflict that has an icon in backup
+        plan = SimpleNamespace(
+            entries={"app.desktop": {"icon": "icons/new.png"}},
+            conflicts=["app.desktop"],
+            missing=[],
+            assets={"icons/new.png": b"data"},
+            sources={"app.desktop": "/path"},
+        )
+        current_state = {"app.desktop": {"icon_path": "/old.png"}}
+
+        confirm_alert = MagicMock()
+        with patch("glyph.dialogs.preview_backup", return_value=plan), \
+             patch("glyph.dialogs.load_state", return_value=current_state), \
+             patch("glyph.dialogs.can_delete_managed_icon", return_value=True), \
+             patch.object(dialogs.Adw, "AlertDialog", return_value=confirm_alert), \
+             patch("glyph.dialogs.prompt_artwork_cleanup") as mock_prompt, \
+             patch("glyph.dialogs.import_backup", return_value=ov.BatchResult()) as mock_import:
+
+            dialogs.handle_import_open_done(parent, dlg, MagicMock())
+            confirm_alert.present.assert_called_once_with(parent)
+
+            # Choose overwrite in conflict dialog -> should trigger prompt_artwork_cleanup
+            conflict_cb = confirm_alert.connect.call_args.args[1]
+            conflict_cb(confirm_alert, "overwrite")
+
+            mock_prompt.assert_called_once()
+            on_choice = mock_prompt.call_args.kwargs["on_choice"]
+
+            # User chooses Keep (delete=False)
+            on_choice(False)
+            mock_import.assert_called_once_with(Path("/backup.tar.gz"), replace_existing=True, delete_icon=False)
+
+    def test_window_on_unregister_appimage_toast_messages(self):
+        app = SimpleNamespace(name="Toast App", desktop_id="toast.desktop")
+        toasts = []
+        stub = SimpleNamespace(
+            _toast=lambda msg: toasts.append(msg),
+            reload=MagicMock(),
+            nav=MagicMock(),
+            _detail_id="toast.desktop",
+            _find=lambda did: app,
+        )
+
+        # 1. icon_kept -> "Artwork and binary file preserved."
+        stub._detail_id = "toast.desktop"
+        with patch("glyph.window.can_delete_managed_icon", return_value=False), \
+             patch("glyph.window.Adw.AlertDialog") as mock_alert, \
+             patch("glyph.appimage.unregister_appimage", return_value={"icon_kept": True}):
+            alert_instance = MagicMock()
+            mock_alert.return_value = alert_instance
+            window.GlyphWindow._on_unregister_appimage(stub, MagicMock())
+            cb = alert_instance.connect.call_args.args[1]
+            cb(alert_instance, "unregister")
+            self.assertEqual(toasts[-1], "Unregistered launcher for Toast App. Artwork and binary file preserved.")
+
+        # 2. icon_skipped with modified -> "Modified artwork and binary file preserved."
+        stub._detail_id = "toast.desktop"
+        with patch("glyph.window.can_delete_managed_icon", return_value=False), \
+             patch("glyph.window.Adw.AlertDialog") as mock_alert, \
+             patch("glyph.appimage.unregister_appimage", return_value={"icon_skipped": True, "icon_skip_reason": "modified"}):
+            alert_instance = MagicMock()
+            mock_alert.return_value = alert_instance
+            window.GlyphWindow._on_unregister_appimage(stub, MagicMock())
+            cb = alert_instance.connect.call_args.args[1]
+            cb(alert_instance, "unregister")
+            self.assertEqual(toasts[-1], "Unregistered launcher for Toast App. Modified artwork and binary file preserved.")
+
+        # 3. icon_skipped with shared -> "Artwork and binary file preserved."
+        stub._detail_id = "toast.desktop"
+        with patch("glyph.window.can_delete_managed_icon", return_value=False), \
+             patch("glyph.window.Adw.AlertDialog") as mock_alert, \
+             patch("glyph.appimage.unregister_appimage", return_value={"icon_skipped": True, "icon_skip_reason": "shared"}):
+            alert_instance = MagicMock()
+            mock_alert.return_value = alert_instance
+            window.GlyphWindow._on_unregister_appimage(stub, MagicMock())
+            cb = alert_instance.connect.call_args.args[1]
+            cb(alert_instance, "unregister")
+            self.assertEqual(toasts[-1], "Unregistered launcher for Toast App. Artwork and binary file preserved.")
+
+        # 4. cleanly deleted -> "Binary file preserved."
+        stub._detail_id = "toast.desktop"
+        with patch("glyph.window.can_delete_managed_icon", return_value=False), \
+             patch("glyph.window.Adw.AlertDialog") as mock_alert, \
+             patch("glyph.appimage.unregister_appimage", return_value={"icon_deleted": True}):
+            alert_instance = MagicMock()
+            mock_alert.return_value = alert_instance
+            window.GlyphWindow._on_unregister_appimage(stub, MagicMock())
+            cb = alert_instance.connect.call_args.args[1]
+            cb(alert_instance, "unregister")
+            self.assertEqual(toasts[-1], "Unregistered launcher for Toast App. Binary file preserved.")
+
 
 if __name__ == "__main__":
     unittest.main()

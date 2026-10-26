@@ -580,14 +580,21 @@ def unregister_appimage(desktop_id: str, *, delete_icon: bool = True) -> dict[st
 
     icon_path_to_delete: Path | None = None
     icon_cleanup_skipped = False
+    icon_skip_reason: str | None = None
+    icon_kept = False
     icon_path_str = record.get("icon_path", "")
 
     if icon_path_str:
         from glyph.overrides import check_managed_icon_deletion
         eligible, asset_path, reason = check_managed_icon_deletion(desktop_id, state)
-        if not eligible and reason in ("modified", "missing_hash"):
-            icon_cleanup_skipped = True
-        elif eligible and delete_icon and asset_path:
+        if not delete_icon:
+            if asset_path and asset_path.exists():
+                icon_kept = True
+        elif not eligible:
+            if asset_path and asset_path.exists():
+                icon_cleanup_skipped = True
+                icon_skip_reason = reason
+        elif eligible and asset_path:
             icon_path_to_delete = asset_path
 
     writes: dict[Path, bytes | None] = {launcher_path: None}
@@ -597,7 +604,12 @@ def unregister_appimage(desktop_id: str, *, delete_icon: bool = True) -> dict[st
     del state[desktop_id]
     _commit(state, writes)
     refresh_desktop_database()
-    return {"icon_skipped": icon_cleanup_skipped}
+    return {
+        "icon_deleted": icon_path_to_delete is not None,
+        "icon_skipped": icon_cleanup_skipped,
+        "icon_skip_reason": icon_skip_reason,
+        "icon_kept": icon_kept,
+    }
 
 
 def discover_registration_candidates(existing_targets: set[str]) -> list[AppImageCandidate]:

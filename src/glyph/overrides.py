@@ -515,6 +515,19 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
     writes = {}
 
     if force and record:
+        external_baseline = text
+        record['original_text'] = external_baseline
+        # Refresh baseline for active overrides or the field being replaced
+        if image is not None or theme_icon is not None or record.get('icon_path') or record.get('theme_icon'):
+            record['original_icon'] = get_icon_value(external_baseline)
+            record['original_icon_lines'] = _snapshot_lines(external_baseline, 'Icon')
+        if name is not None or record.get('custom_name'):
+            record['original_name'] = get_name_value(external_baseline)
+            record['original_name_lines'] = _snapshot_lines(external_baseline, 'Name')
+        if command is not None or record.get('custom_command'):
+            record['original_command'] = get_exec_value(external_baseline)
+            record['original_exec_lines'] = _snapshot_lines(external_baseline, 'Exec')
+
         # Rebase still-active saved overrides that this operation is not replacing
         if image is None and theme_icon is None:
             if record.get('icon_path'):
@@ -531,7 +544,7 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
         id_hash = hashlib.sha256(desktop_id.encode('utf-8')).hexdigest()[:16]
         img_hash = hashlib.sha256(image).hexdigest()[:16]
         dest = ICONS_DIR / f'{id_hash}-{img_hash}{suffix.lower()}'
-        if not record.get('icon_path') and not record.get('theme_icon'):
+        if not force and not record.get('icon_path') and not record.get('theme_icon'):
             record['original_icon'] = get_icon_value(text)
             record['original_icon_lines'] = _snapshot_lines(text, 'Icon')
         old = record.get('icon_path')
@@ -552,7 +565,7 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
         theme_icon = theme_icon.strip()
         if not theme_icon or len(theme_icon) > 256 or '/' in theme_icon or '\\' in theme_icon or any(ord(c) < 32 for c in theme_icon):
             raise OverrideError('Invalid icon theme name.')
-        if not record.get('icon_path') and not record.get('theme_icon'):
+        if not force and not record.get('icon_path') and not record.get('theme_icon'):
             record['original_icon'] = get_icon_value(text)
             record['original_icon_lines'] = _snapshot_lines(text, 'Icon')
         old = record.get('icon_path')
@@ -572,7 +585,7 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
         name = name.strip()
         if not name or len(name) > 256 or any(ord(c) < 32 for c in name):
             raise OverrideError('Enter a name of 1–256 characters without control characters.')
-        if not record.get('custom_name'):
+        if not force and not record.get('custom_name'):
             record['original_name'] = get_name_value(text)
             record['original_name_lines'] = _snapshot_lines(text, 'Name')
         record['custom_name'] = name
@@ -581,7 +594,7 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
         command = command.strip()
         if not command or len(command) > 1024 or any(ord(c) < 32 and c not in '\t ' for c in command):
             raise OverrideError('Enter a valid command of 1–1024 characters.')
-        if not record.get('custom_command'):
+        if not force and not record.get('custom_command'):
             record['original_command'] = get_exec_value(text)
             record['original_exec_lines'] = _snapshot_lines(text, 'Exec')
         record['custom_command'] = command
@@ -642,7 +655,23 @@ def _revert(desktop_id: str, key: str, *, force: bool = False, delete_icon: bool
         raise OverrideError(f'No custom {key.lower()} override for this app.')
     local, text, record = _prepare(state, desktop_id, record['local_desktop'], force=force)
 
+    saved_key = 'exec' if key == 'Exec' else key.lower()
     if force and record:
+        external_baseline = text
+        record['original_text'] = external_baseline
+        # Restore the field being reverted from the current external baseline
+        saved = _snapshot_lines(external_baseline, key)
+        # Refresh baselines for other still-active overrides
+        if key != 'Icon' and (record.get('icon_path') or record.get('theme_icon')):
+            record['original_icon'] = get_icon_value(external_baseline)
+            record['original_icon_lines'] = _snapshot_lines(external_baseline, 'Icon')
+        if key != 'Name' and record.get('custom_name'):
+            record['original_name'] = get_name_value(external_baseline)
+            record['original_name_lines'] = _snapshot_lines(external_baseline, 'Name')
+        if key != 'Exec' and record.get('custom_command'):
+            record['original_command'] = get_exec_value(external_baseline)
+            record['original_exec_lines'] = _snapshot_lines(external_baseline, 'Exec')
+
         # Rebase still-active saved overrides that this operation is not reverting
         if key != 'Icon':
             if record.get('icon_path'):
@@ -653,16 +682,16 @@ def _revert(desktop_id: str, key: str, *, force: bool = False, delete_icon: bool
             text = set_name_value(text, record['custom_name'])
         if key != 'Exec' and record.get('custom_command'):
             text = set_exec_value(text, record['custom_command'])
+    else:
+        saved = record.get('original_' + saved_key + '_lines')
+        if saved is None:
+            source = Path(record.get('source_path', ''))
+            if record.get('created_local') and source != local and source.is_file():
+                saved = _snapshot_lines(_read(source, MAX_DESKTOP_BYTES).decode('utf-8'), key)
+            else:
+                value = record.get('original_' + saved_key, '')
+                saved = [f'{key}={_escape(value)}\n'] if value else []
 
-    saved_key = 'exec' if key == 'Exec' else key.lower()
-    saved = record.get('original_' + saved_key + '_lines')
-    if saved is None:
-        source = Path(record.get('source_path', ''))
-        if record.get('created_local') and source != local and source.is_file():
-            saved = _snapshot_lines(_read(source, MAX_DESKTOP_BYTES).decode('utf-8'), key)
-        else:
-            value = record.get('original_' + saved_key, '')
-            saved = [f'{key}={_escape(value)}\n'] if value else []
     text = _replace_lines(text, key, saved)
     writes = {local: text.encode()}
     asset = record.get('icon_path') if key == 'Icon' else None
@@ -766,25 +795,33 @@ def restore_stock_launcher(desktop_id: str, *, force: bool = False, delete_icon:
 
 
 @operation
-def discard_override(desktop_id: str, *, delete_icon: bool = True) -> None:
+def discard_override(desktop_id: str, *, delete_icon: bool = True) -> dict[str, bool]:
     """Discard Glyph's tracked overrides for a desktop entry without altering unrelated lines."""
     _id(desktop_id)
     state = load_state()
     record = state.pop(desktop_id, None)
     if not record:
-        return
+        return {'icon_skipped': False}
     writes: dict[Path, bytes | None] = {}
+    icon_skipped = False
+
     if delete_icon:
         temp_state = {desktop_id: record, **state}
-        eligible, asset_path, _ = check_managed_icon_deletion(desktop_id, temp_state)
-        if eligible and asset_path:
-            writes[asset_path] = None
+        eligible, asset_path, reason = check_managed_icon_deletion(desktop_id, temp_state)
+        if not eligible and reason in ('modified', 'missing_hash', 'shared'):
+            icon_skipped = True
+        elif eligible and asset_path:
             local_str = record.get('local_desktop')
             local = Path(local_str) if local_str else None
+            needs_launcher_rewrite = False
+            new_launcher_bytes = None
+
             if local and local.is_file():
                 try:
+                    _confined(local, APPLICATIONS_DIR)
                     text = _read(local, MAX_DESKTOP_BYTES).decode('utf-8')
                     if get_icon_value(text) == str(asset_path):
+                        # Determine replacement in order: stock icon, then saved original icon
                         stock_icon = ""
                         stock_path = find_stock(desktop_id)
                         if stock_path and Path(stock_path).is_file():
@@ -794,14 +831,30 @@ def discard_override(desktop_id: str, *, delete_icon: bool = True) -> None:
                             except Exception:
                                 stock_icon = ""
                         if not stock_icon:
-                            stock_icon = record.get('original_icon', '')
+                            orig = record.get('original_icon', '')
+                            if orig and orig != str(asset_path):
+                                stock_icon = orig
+
                         if stock_icon and stock_icon != str(asset_path):
                             new_text = set_icon_value(text, stock_icon)
-                            writes[local] = new_text.encode('utf-8')
+                        else:
+                            # If neither provides a replacement, remove only the Icon= key
+                            new_text = _replace_lines(text, 'Icon', [])
+
+                        needs_launcher_rewrite = True
+                        new_launcher_bytes = new_text.encode('utf-8')
                 except Exception:
-                    pass
+                    # If the launcher cannot be read or safely rewritten, preserve the image and skip cleanup
+                    icon_skipped = True
+
+            if not icon_skipped:
+                if needs_launcher_rewrite and local and new_launcher_bytes is not None:
+                    writes[local] = new_launcher_bytes
+                writes[asset_path] = None
+
     _commit(state, writes)
     refresh_desktop_database()
+    return {'icon_skipped': icon_skipped}
 
 
 def _batch(ids, function) -> BatchResult:
@@ -816,8 +869,8 @@ def _batch(ids, function) -> BatchResult:
 
 
 @operation
-def revert_all_icons() -> BatchResult:
-    return _batch([k for k, r in load_state().items() if r.get('icon_path')], revert_icon)
+def revert_all_icons(*, delete_icon: bool = True) -> BatchResult:
+    return _batch([k for k, r in load_state().items() if r.get('icon_path')], lambda did: revert_icon(did, delete_icon=delete_icon))
 
 
 @operation
@@ -826,6 +879,6 @@ def revert_all_names() -> BatchResult:
 
 
 @operation
-def restore_all_to_stock() -> BatchResult:
+def restore_all_to_stock(*, delete_icon: bool = True) -> BatchResult:
     load_state()
-    return _batch([k for k in desktop_index([APPLICATIONS_DIR]) if find_stock(k)], restore_stock_launcher)
+    return _batch([k for k in desktop_index([APPLICATIONS_DIR]) if find_stock(k)], lambda did: restore_stock_launcher(did, delete_icon=delete_icon))
