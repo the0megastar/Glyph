@@ -259,7 +259,7 @@
         <div class="install-grid">
           <div class="install-card package-guide">
             <h3 class="install-card-title">Install a downloaded package</h3>
-            <p class="install-card-desc">Open a terminal in the folder containing your download. Examples use v0.1.3; use the filename you downloaded.</p>
+            <p class="install-card-desc">Open a terminal in the folder containing your download. Examples use v0.1.5; use the filename you downloaded.</p>
             <div class="package-tabs" aria-label="Package format">
               <button type="button" id="tab-fedora" data-package="fedora">Fedora<span>.rpm</span></button>
               <button type="button" id="tab-debian" data-package="debian">Debian / Ubuntu<span>.deb</span></button>
@@ -269,25 +269,25 @@
             </div>
             <section class="package-panel" id="panel-fedora" aria-labelledby="tab-fedora">
               <h4>Fedora</h4><p class="install-card-desc">Install the downloaded RPM with DNF. It also installs required dependencies.</p>
-              <div class="command-box"><code class="command-text" id="command-fedora">sudo dnf install ./glyph-0.1.3.rpm</code><button type="button" class="copy-btn" id="copy-fedora" aria-label="Copy Fedora command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-fedora" aria-live="polite">Copy</span></button></div>
+              <div class="command-box"><code class="command-text" id="command-fedora">sudo dnf install ./glyph-0.1.5.rpm</code><button type="button" class="copy-btn" id="copy-fedora" aria-label="Copy Fedora command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-fedora" aria-live="polite">Copy</span></button></div>
             </section>
             <section class="package-panel" id="panel-debian" aria-labelledby="tab-debian">
               <h4>Debian / Ubuntu</h4><p class="install-card-desc">Install the downloaded DEB with APT. Your distribution must provide compatible dependencies.</p>
-              <div class="command-box"><code class="command-text" id="command-debian">sudo apt install ./glyph-0.1.3.deb</code><button type="button" class="copy-btn" id="copy-debian" aria-label="Copy Debian / Ubuntu command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-debian" aria-live="polite">Copy</span></button></div>
+              <div class="command-box"><code class="command-text" id="command-debian">sudo apt install ./glyph-0.1.5.deb</code><button type="button" class="copy-btn" id="copy-debian" aria-label="Copy Debian / Ubuntu command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-debian" aria-live="polite">Copy</span></button></div>
             </section>
             <section class="package-panel" id="panel-arch" aria-labelledby="tab-arch">
               <h4>Arch Linux</h4><p class="install-card-desc">Install the downloaded Arch package with pacman. No build step is needed.</p>
-              <div class="command-box"><code class="command-text" id="command-arch">sudo pacman -U ./glyph-0.1.3-1-any.pkg.tar.zst</code><button type="button" class="copy-btn" id="copy-arch" aria-label="Copy Arch Linux command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-arch" aria-live="polite">Copy</span></button></div>
+              <div class="command-box"><code class="command-text" id="command-arch">sudo pacman -U ./glyph-0.1.5-1-any.pkg.tar.zst</code><button type="button" class="copy-btn" id="copy-arch" aria-label="Copy Arch Linux command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-arch" aria-live="polite">Copy</span></button></div>
             </section>
             <section class="package-panel" id="panel-flatpak" aria-labelledby="tab-flatpak">
               <h4>Flatpak</h4><p class="install-card-desc">With Flatpak installed, install the bundle for your user account. A runtime download may also be needed.</p>
-              <div class="command-box"><code class="command-text" id="command-flatpak">flatpak install --user ./Glyph-0.1.3-x86_64.flatpak</code><button type="button" class="copy-btn" id="copy-flatpak" aria-label="Copy Flatpak command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-flatpak" aria-live="polite">Copy</span></button></div>
+              <div class="command-box"><code class="command-text" id="command-flatpak">flatpak install --user ./Glyph-0.1.5-x86_64.flatpak</code><button type="button" class="copy-btn" id="copy-flatpak" aria-label="Copy Flatpak command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-flatpak" aria-live="polite">Copy</span></button></div>
 <p class="package-note">The example is for x86_64. For ARM64, download the aarch64 file and use that filename instead.</p>
             </section>
             <section class="package-panel" id="panel-appimage" aria-labelledby="tab-appimage">
               <h4>AppImage</h4><p class="install-card-desc">Make the downloaded file executable, then run it.</p>
-              <div class="command-box"><code class="command-text" id="command-appimage">chmod +x ./Glyph-0.1.3-x86_64.AppImage
-./Glyph-0.1.3-x86_64.AppImage</code><button type="button" class="copy-btn" id="copy-appimage" aria-label="Copy AppImage command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-appimage" aria-live="polite">Copy</span></button></div>
+              <div class="command-box"><code class="command-text" id="command-appimage">chmod +x ./Glyph-0.1.5-x86_64.AppImage
+./Glyph-0.1.5-x86_64.AppImage</code><button type="button" class="copy-btn" id="copy-appimage" aria-label="Copy AppImage command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="label-appimage" aria-live="polite">Copy</span></button></div>
 <p class="package-note">The example is for x86_64. For ARM64, download the aarch64 file and use that filename instead.</p>
             </section>
           </div>
@@ -330,8 +330,8 @@
         <div class="release-card" id="latestReleaseCard">
           <div class="release-header">
             <div>
-              <h3 id="latestReleaseTitle" class="release-title">Glyph v0.1.3</h3>
-              <span id="latestReleaseSubtitle" class="release-subtitle">Latest Release • September 8, 2026</span>
+              <h3 id="latestReleaseTitle" class="release-title">Glyph v0.1.5</h3>
+              <span id="latestReleaseSubtitle" class="release-subtitle">Latest Release • October 26, 2026</span>
             </div>
             <div class="release-actions">
               <span id="latestReleaseBadge" class="release-badge">Latest</span>
@@ -344,11 +344,12 @@
 
           <div id="latestReleaseBody">
             <ul class="release-notes-list">
-              <li><strong>Bulk Name Revert</strong> - Restore original display names across all customized applications in one click while preserving custom icons and user launchers.</li>
-              <li><strong>Write-Ahead Transaction Journaling &amp; Crash Recovery</strong> - Atomic <code>.journal.json</code> journaling automatically rolls back partial writes on unexpected interruptions, and corrupted configs fail closed safely.</li>
-              <li><strong>Portable Backups (Format Version 2)</strong> - Stores relative icon assets, full custom display names, and application metadata with preview dry-runs and directory traversal rejection.</li>
-              <li><strong>Desktop ID &amp; Path Hardening</strong> - Full support for nested desktop IDs with deterministic flattening, single-pass stock catalog caching, and safe legacy override cleanup.</li>
-              <li><strong>Flatpak Sandbox Correctness &amp; Host Path Routing</strong> - Direct override writing via <code>HOST_XDG_DATA_HOME</code>, FreeDesktop <code>.png</code>, <code>.svg</code>, and <code>.xpm</code> icon suffix normalization, and graceful host launcher bounds.</li>
+              <li><strong>Installed Icon Theme Browser &amp; Picker</strong> - Browse icons directly from installed icon themes or search by icon name, with choices for theme-following or fixed artwork.</li>
+              <li><strong>Package Classification &amp; Version Provenance</strong> - Accurate detection of RPM, Flatpak, DEB, Pacman, Snap, and AppImage package sources with system/user installation indicators.</li>
+              <li><strong>Unified Application Launch Service</strong> - Complete launch parity across native environments and Flatpak builds via host spawning adapters.</li>
+              <li><strong>Custom Launch Command Editor</strong> - Customize application launch commands safely with dedicated one-click reset to original executables.</li>
+              <li><strong>AppImage Discovery &amp; Safe Lifecycle</strong> - Discover AppImages in <code>~/Applications</code>, safely register external AppImages with atomic copying, and unregister cleanly without deleting binaries.</li>
+              <li><strong>Baseline Safety, Conflict Protection &amp; Artwork Cleanup</strong> - Non-destructive conflict handling, baseline rebasing, and prompted cleanup of managed artwork with smart asset retention.</li>
             </ul>
           </div>
         </div>

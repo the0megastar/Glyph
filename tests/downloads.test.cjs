@@ -2,16 +2,16 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { resolveReleaseDownloads: resolve, renderReleaseDownloads: render } = require('../app.js');
-const names = ['Glyph-0.1.3-x86_64.flatpak', 'Glyph-0.1.3-aarch64.flatpak', 'Glyph-0.1.3-x86_64.AppImage', 'Glyph-0.1.3-aarch64.AppImage', 'glyph-0.1.3.deb', 'glyph-0.1.3.rpm', 'glyph-0.1.3-1-any.pkg.tar.zst'];
-const asset = name => ({ name, browser_download_url: `https://github.com/the0megastar/Glyph/releases/download/v0.1.3/${name}` });
-const release = assets => ({ tag_name: 'v0.1.3', assets });
+const names = ['Glyph-0.1.5-x86_64.flatpak', 'Glyph-0.1.5-aarch64.flatpak', 'Glyph-0.1.5-x86_64.AppImage', 'Glyph-0.1.5-aarch64.AppImage', 'glyph-0.1.5.deb', 'glyph-0.1.5.rpm', 'glyph-0.1.5-1-any.pkg.tar.zst'];
+const asset = name => ({ name, browser_download_url: `https://github.com/the0megastar/Glyph/releases/download/v0.1.5/${name}` });
+const release = assets => ({ tag_name: 'v0.1.5', assets });
 const complete = resolve(release(names.map(asset)));
 test('seven exact mappings do not depend on asset order', () => {
   assert.deepEqual(Object.values(complete), names.map(name => asset(name).browser_download_url));
   assert.deepEqual(resolve(release(names.map(asset).reverse())), complete);
 });
 test('legacy, missing, unrelated, duplicate and malformed assets never select a binary', () => {
-  const result = resolve(release([asset('Glyph-0.1.3.AppImage'), null, {}, asset(names[0]), asset(names[0]), asset(names[2] + '.sha256'), asset('Glyph-0.1.2-aarch64.AppImage')]));
+  const result = resolve(release([asset('Glyph-0.1.5.AppImage'), null, {}, asset(names[0]), asset(names[0]), asset(names[2] + '.sha256'), asset('Glyph-0.1.3-aarch64.AppImage')]));
   assert.ok(Object.values(result).every(value => value === null));
   assert.ok(Object.values(resolve(release())).every(value => value === null));
   assert.throws(() => resolve({ tag_name: null }));
