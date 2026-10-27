@@ -391,7 +391,10 @@ def _is_icon_eligible_for_deletion(asset_path: Path, expected_hash: str | None, 
         return False
     if asset_path.is_symlink() or not asset_path.is_file():
         return False
-    if any(r.get('icon_path') == str(asset_path) for k, r in state.items() if k != desktop_id):
+    asset_str = str(asset_path)
+    if any(r.get('icon_path') == asset_str for k, r in state.items() if k != desktop_id):
+        return False
+    if any(r.get('original_icon') == asset_str for k, r in state.items() if k != desktop_id):
         return False
     if not expected_hash:
         return False
@@ -429,6 +432,8 @@ def check_managed_icon_deletion(desktop_id: str, state: dict | None = None) -> t
     if not asset_path.is_file():
         return False, asset_path, "missing"
     if any(r.get('icon_path') == asset for k, r in state.items() if k != desktop_id):
+        return False, asset_path, "shared"
+    if any(r.get('original_icon') == asset for k, r in state.items() if k != desktop_id):
         return False, asset_path, "shared"
     expected_hash = record.get('icon_hash')
     if not expected_hash:
@@ -511,6 +516,22 @@ def validate_image(data: bytes, suffix: str) -> None:
         raise OverrideError(f'The selected image cannot be decoded: {exc.message}') from exc
 
 
+def _get_saved_original_lines(record: dict, key: str, local: Path) -> list[str]:
+    saved_key = 'exec' if key == 'Exec' else key.lower()
+    saved = record.get('original_' + saved_key + '_lines')
+    if saved is None:
+        source = Path(record.get('source_path', ''))
+        if record.get('created_local') and source != local and source.is_file():
+            try:
+                saved = _snapshot_lines(_read(source, MAX_DESKTOP_BYTES).decode('utf-8'), key)
+            except Exception:
+                saved = None
+        if saved is None:
+            value = record.get('original_' + saved_key, '')
+            saved = [f'{key}={_escape(value)}\n'] if value else []
+    return list(saved)
+
+
 def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=None, theme_icon=None, command=None, force: bool = False, delete_icon: bool = True):
     local, text, record = _prepare(state, desktop_id, source_desktop, force=force)
     writes = {}
@@ -518,33 +539,66 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
     if force and record:
         external_baseline = text
         # Refresh baseline for active overrides or the field being replaced
+
+        # 1. Icon
         ext_icon = get_icon_value(external_baseline)
+        active_icon = record.get('icon_path') or record.get('theme_icon')
+        icon_changed_externally = not active_icon or ext_icon != active_icon
         if image is not None or theme_icon is not None:
-            record['original_icon'] = ext_icon
-            record['original_icon_lines'] = _snapshot_lines(external_baseline, 'Icon')
-        elif record.get('icon_path') or record.get('theme_icon'):
-            active_icon = record.get('icon_path') or record.get('theme_icon')
-            if ext_icon != active_icon:
+            if icon_changed_externally:
                 record['original_icon'] = ext_icon
                 record['original_icon_lines'] = _snapshot_lines(external_baseline, 'Icon')
+            elif not record.get('original_icon_lines'):
+                record['original_icon_lines'] = _get_saved_original_lines(record, 'Icon', local)
+        elif active_icon and icon_changed_externally:
+            record['original_icon'] = ext_icon
+            record['original_icon_lines'] = _snapshot_lines(external_baseline, 'Icon')
 
+        # 2. Name
         ext_name = get_name_value(external_baseline)
-        if name is not None:
-            record['original_name'] = ext_name
-            record['original_name_lines'] = _snapshot_lines(external_baseline, 'Name')
-        elif record.get('custom_name'):
-            if ext_name != record.get('custom_name'):
-                record['original_name'] = ext_name
-                record['original_name_lines'] = _snapshot_lines(external_baseline, 'Name')
+        ext_name_lines = _snapshot_lines(external_baseline, 'Name')
+        active_name = record.get('custom_name')
+        name_changed_externally = not active_name or ext_name != active_name
+        localized_ext = [line for line in ext_name_lines if not line.strip().startswith('Name=')]
 
+        if name is not None:
+            if name_changed_externally:
+                record['original_name'] = ext_name
+                record['original_name_lines'] = ext_name_lines
+            elif localized_ext:
+                orig_lines = _get_saved_original_lines(record, 'Name', local)
+                orig_default = [line for line in orig_lines if line.strip().startswith('Name=')]
+                if not orig_default:
+                    orig_val = record.get('original_name', '')
+                    orig_default = [f'Name={_escape(orig_val)}\n'] if orig_val else []
+                record['original_name_lines'] = orig_default + localized_ext
+            elif not record.get('original_name_lines'):
+                record['original_name_lines'] = _get_saved_original_lines(record, 'Name', local)
+        elif active_name:
+            if name_changed_externally:
+                record['original_name'] = ext_name
+                record['original_name_lines'] = ext_name_lines
+            elif localized_ext:
+                orig_lines = _get_saved_original_lines(record, 'Name', local)
+                orig_default = [line for line in orig_lines if line.strip().startswith('Name=')]
+                if not orig_default:
+                    orig_val = record.get('original_name', '')
+                    orig_default = [f'Name={_escape(orig_val)}\n'] if orig_val else []
+                record['original_name_lines'] = orig_default + localized_ext
+
+        # 3. Exec / Command
         ext_cmd = get_exec_value(external_baseline)
+        active_cmd = record.get('custom_command')
+        cmd_changed_externally = not active_cmd or ext_cmd != active_cmd
         if command is not None:
-            record['original_command'] = ext_cmd
-            record['original_exec_lines'] = _snapshot_lines(external_baseline, 'Exec')
-        elif record.get('custom_command'):
-            if ext_cmd != record.get('custom_command'):
+            if cmd_changed_externally:
                 record['original_command'] = ext_cmd
                 record['original_exec_lines'] = _snapshot_lines(external_baseline, 'Exec')
+            elif not record.get('original_exec_lines'):
+                record['original_exec_lines'] = _get_saved_original_lines(record, 'Exec', local)
+        elif active_cmd and cmd_changed_externally:
+            record['original_command'] = ext_cmd
+            record['original_exec_lines'] = _snapshot_lines(external_baseline, 'Exec')
 
         # Rebase still-active saved overrides that this operation is not replacing
         if image is None and theme_icon is None:
@@ -571,7 +625,8 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
         if old and old != str(dest) and delete_icon:
             old_path = Path(old)
             if _is_icon_eligible_for_deletion(old_path, old_hash, desktop_id, state):
-                old_path_to_delete = old_path
+                if record.get('original_icon') != old and str(old_path) not in (record.get('original_icon') or ''):
+                    old_path_to_delete = old_path
         record.pop('theme_icon', None)
         record['icon_path'] = str(dest)
         record['icon_hash'] = hashlib.sha256(image).hexdigest()
@@ -592,7 +647,8 @@ def _apply(state, desktop_id, source_desktop, *, image=None, suffix=None, name=N
         if old and delete_icon:
             old_path = Path(old)
             if _is_icon_eligible_for_deletion(old_path, old_hash, desktop_id, state):
-                old_path_to_delete = old_path
+                if record.get('original_icon') != old and str(old_path) not in (record.get('original_icon') or ''):
+                    old_path_to_delete = old_path
         record.pop('icon_path', None)
         record.pop('icon_hash', None)
         record['theme_icon'] = theme_icon
@@ -676,8 +732,40 @@ def _revert(desktop_id: str, key: str, *, force: bool = False, delete_icon: bool
     saved_key = 'exec' if key == 'Exec' else key.lower()
     if force and record:
         external_baseline = text
-        # Restore the field being reverted from the current external baseline
-        saved = _snapshot_lines(external_baseline, key)
+        field_changed_externally = False
+        if key == 'Icon':
+            ext_icon = get_icon_value(external_baseline)
+            active_icon = record.get('icon_path') or record.get('theme_icon')
+            field_changed_externally = not active_icon or ext_icon != active_icon
+        elif key == 'Name':
+            ext_name = get_name_value(external_baseline)
+            ext_name_lines = _snapshot_lines(external_baseline, 'Name')
+            active_name = record.get('custom_name')
+            if not active_name or ext_name != active_name:
+                field_changed_externally = True
+            else:
+                localized_ext = [line for line in ext_name_lines if not line.strip().startswith('Name=')]
+                if localized_ext:
+                    field_changed_externally = True
+        elif key == 'Exec':
+            ext_cmd = get_exec_value(external_baseline)
+            active_cmd = record.get('custom_command')
+            field_changed_externally = not active_cmd or ext_cmd != active_cmd
+
+        if field_changed_externally:
+            if key == 'Name' and record.get('custom_name') and get_name_value(external_baseline) == record.get('custom_name'):
+                orig_lines = _get_saved_original_lines(record, 'Name', local)
+                orig_default = [line for line in orig_lines if line.strip().startswith('Name=')]
+                if not orig_default:
+                    orig_val = record.get('original_name', '')
+                    orig_default = [f'Name={_escape(orig_val)}\n'] if orig_val else []
+                localized_ext = [line for line in _snapshot_lines(external_baseline, 'Name') if not line.strip().startswith('Name=')]
+                saved = orig_default + localized_ext
+            else:
+                saved = _snapshot_lines(external_baseline, key)
+        else:
+            saved = _get_saved_original_lines(record, key, local)
+
         # Refresh baselines for other still-active overrides only if externally changed
         ext_icon = get_icon_value(external_baseline)
         if key != 'Icon' and (record.get('icon_path') or record.get('theme_icon')):
@@ -687,10 +775,19 @@ def _revert(desktop_id: str, key: str, *, force: bool = False, delete_icon: bool
                 record['original_icon_lines'] = _snapshot_lines(external_baseline, 'Icon')
 
         ext_name = get_name_value(external_baseline)
+        ext_name_lines = _snapshot_lines(external_baseline, 'Name')
+        localized_ext = [line for line in ext_name_lines if not line.strip().startswith('Name=')]
         if key != 'Name' and record.get('custom_name'):
             if ext_name != record.get('custom_name'):
                 record['original_name'] = ext_name
-                record['original_name_lines'] = _snapshot_lines(external_baseline, 'Name')
+                record['original_name_lines'] = ext_name_lines
+            elif localized_ext:
+                orig_lines = _get_saved_original_lines(record, 'Name', local)
+                orig_default = [line for line in orig_lines if line.strip().startswith('Name=')]
+                if not orig_default:
+                    orig_val = record.get('original_name', '')
+                    orig_default = [f'Name={_escape(orig_val)}\n'] if orig_val else []
+                record['original_name_lines'] = orig_default + localized_ext
 
         ext_cmd = get_exec_value(external_baseline)
         if key != 'Exec' and record.get('custom_command'):
@@ -709,14 +806,7 @@ def _revert(desktop_id: str, key: str, *, force: bool = False, delete_icon: bool
         if key != 'Exec' and record.get('custom_command'):
             text = set_exec_value(text, record['custom_command'])
     else:
-        saved = record.get('original_' + saved_key + '_lines')
-        if saved is None:
-            source = Path(record.get('source_path', ''))
-            if record.get('created_local') and source != local and source.is_file():
-                saved = _snapshot_lines(_read(source, MAX_DESKTOP_BYTES).decode('utf-8'), key)
-            else:
-                value = record.get('original_' + saved_key, '')
-                saved = [f'{key}={_escape(value)}\n'] if value else []
+        saved = _get_saved_original_lines(record, key, local)
 
     text = _replace_lines(text, key, saved)
     writes = {local: text.encode()}

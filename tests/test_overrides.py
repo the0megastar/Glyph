@@ -1196,6 +1196,94 @@ class TestOverrides(unittest.TestCase):
         self.assertFalse(res_keep["icon_deleted"])
         self.assertTrue(icon_keep.exists())
 
+    def test_force_apply_and_revert_protect_saved_originals_when_active_override_unchanged(self):
+        img2 = self.root / "img2.png"
+        img2.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x55" * 64)
+
+        # 1. Force-apply icon when only unrelated key changed; delete_icon=True deletes old image; reset restores stock icon
+        p1 = self.app_dir / "icon_force.desktop"
+        p1.write_text("[Desktop Entry]\nType=Application\nName=IconForce\nIcon=stock-icon-val\nExec=/bin/true\n", encoding="utf-8")
+        apply_icon("icon_force.desktop", str(p1), str(self.sample_png))
+        icon1_path = Path(load_state()["icon_force.desktop"]["icon_path"])
+
+        text1 = p1.read_text(encoding="utf-8")
+        p1.write_text(text1 + "X-Unrelated-Key=1\n", encoding="utf-8")
+        apply_icon("icon_force.desktop", str(p1), str(img2), force=True, delete_icon=True)
+        self.assertFalse(icon1_path.exists(), "Previous image should be deleted")
+        icon2_path = Path(load_state()["icon_force.desktop"]["icon_path"])
+
+        revert_icon("icon_force.desktop")
+        text_reset = p1.read_text(encoding="utf-8")
+        self.assertIn("Icon=stock-icon-val", text_reset)
+        self.assertNotIn(str(icon1_path), text_reset)
+        self.assertNotIn(str(icon2_path), text_reset)
+        self.assertIn("X-Unrelated-Key=1", text_reset)
+
+        # 2. Repeat with delete_icon=False (keep previous image); reset still restores stock icon
+        p2 = self.app_dir / "icon_keep.desktop"
+        p2.write_text("[Desktop Entry]\nType=Application\nName=IconKeep\nIcon=stock-icon-2\nExec=/bin/true\n", encoding="utf-8")
+        apply_icon("icon_keep.desktop", str(p2), str(self.sample_png))
+        icon1_keep = Path(load_state()["icon_keep.desktop"]["icon_path"])
+
+        p2.write_text(p2.read_text(encoding="utf-8") + "X-Unrelated-Key=1\n", encoding="utf-8")
+        apply_icon("icon_keep.desktop", str(p2), str(img2), force=True, delete_icon=False)
+        self.assertTrue(icon1_keep.exists(), "Previous image should be kept")
+        revert_icon("icon_keep.desktop")
+        self.assertIn("Icon=stock-icon-2", p2.read_text(encoding="utf-8"))
+
+        # 3. Custom name and command, unrelated external edit, force-apply new values; reset restores pre-Glyph values
+        p3 = self.app_dir / "nc_test.desktop"
+        p3.write_text("[Desktop Entry]\nType=Application\nName=PreName\nExec=pre-exec\nIcon=pre-icon\n", encoding="utf-8")
+        apply_name("nc_test.desktop", str(p3), "CustomName1")
+        apply_command("nc_test.desktop", str(p3), "custom-exec-1")
+
+        p3.write_text(p3.read_text(encoding="utf-8") + "X-Unrelated-Key=Survives\n", encoding="utf-8")
+        apply_name("nc_test.desktop", str(p3), "CustomName2", force=True)
+        apply_command("nc_test.desktop", str(p3), "custom-exec-2", force=True)
+
+        revert_name("nc_test.desktop")
+        self.assertIn("Name=PreName", p3.read_text(encoding="utf-8"))
+        revert_command("nc_test.desktop")
+        self.assertIn("Exec=pre-exec", p3.read_text(encoding="utf-8"))
+        self.assertIn("X-Unrelated-Key=Survives", p3.read_text(encoding="utf-8"))
+
+        # 4. Force-revert after unrelated edit while field still contains active custom value
+        p4 = self.app_dir / "frevert.desktop"
+        p4.write_text("[Desktop Entry]\nType=Application\nName=BaseName\nExec=base-exec\nIcon=base-icon\n", encoding="utf-8")
+        apply_name("frevert.desktop", str(p4), "ActiveCustomName")
+        p4.write_text(p4.read_text(encoding="utf-8") + "X-ExtKey=1\n", encoding="utf-8")
+
+        revert_name("frevert.desktop", force=True)
+        text4 = p4.read_text(encoding="utf-8")
+        self.assertIn("Name=BaseName", text4)
+        self.assertNotIn("ActiveCustomName", text4)
+        self.assertIn("X-ExtKey=1", text4)
+
+        # 5. Localized Name[...] line changed externally while default Name still equals active custom name
+        p5 = self.app_dir / "loc_name.desktop"
+        p5.write_text("[Desktop Entry]\nType=Application\nName=DefaultStock\nName[fr]=StockFr\nIcon=loc-icon\n", encoding="utf-8")
+        apply_name("loc_name.desktop", str(p5), "ActiveGlyphName")
+
+        p5.write_text("[Desktop Entry]\nType=Application\nName=ActiveGlyphName\nName[fr]=NouveauNomFr\nIcon=loc-icon\nX-Unrelated=1\n", encoding="utf-8")
+        apply_icon("loc_name.desktop", str(p5), str(self.sample_png), force=True)
+        revert_name("loc_name.desktop")
+        text5 = p5.read_text(encoding="utf-8")
+        self.assertIn("Name=DefaultStock", text5)
+        self.assertIn("Name[fr]=NouveauNomFr", text5)
+        self.assertIn("X-Unrelated=1", text5)
+
+        # 6. Actual external changes to the field being overwritten become the new reset baseline
+        p6 = self.app_dir / "ext_change.desktop"
+        p6.write_text("[Desktop Entry]\nType=Application\nName=Stock6\nExec=stock-exec-6\nIcon=stock-icon-6\n", encoding="utf-8")
+        apply_name("ext_change.desktop", str(p6), "Custom6")
+
+        p6.write_text("[Desktop Entry]\nType=Application\nName=UpstreamNewName\nExec=stock-exec-6\nIcon=stock-icon-6\nX-Vendor=Val\n", encoding="utf-8")
+        apply_name("ext_change.desktop", str(p6), "Custom6-V2", force=True)
+        revert_name("ext_change.desktop")
+        text6 = p6.read_text(encoding="utf-8")
+        self.assertIn("Name=UpstreamNewName", text6)
+        self.assertIn("X-Vendor=Val", text6)
+
 
 if __name__ == "__main__":
     unittest.main()
