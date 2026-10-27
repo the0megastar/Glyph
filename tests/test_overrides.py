@@ -39,11 +39,12 @@ from glyph.overrides import (
 )
 
 
-def _valid_png_bytes() -> bytes:
+def _valid_png_bytes(tag: str = "") -> bytes:
     # 1x1 transparent PNG
-    return base64.b64decode(
+    base = base64.b64decode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
     )
+    return base + tag.encode("utf-8")
 
 
 class TestOverrides(unittest.TestCase):
@@ -659,7 +660,7 @@ class TestOverrides(unittest.TestCase):
 
         # 4. Force apply icon (e.g. user accepted Overwrite on icon change)
         new_png = self.root / "new_icon.png"
-        new_png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x55" * 64)
+        new_png.write_bytes(_valid_png_bytes("new"))
         apply_icon("conflict_app.desktop", str(p), str(new_png), force=True)
 
         content = p.read_text(encoding="utf-8")
@@ -745,7 +746,7 @@ class TestOverrides(unittest.TestCase):
 
         # 1. Replace with delete_icon=False: keeps icon_v1
         icon2_file = self.root / "art2.png"
-        icon2_file.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x66" * 64)
+        icon2_file.write_bytes(_valid_png_bytes("art2"))
         apply_icon("artwork_app.desktop", str(p), str(icon2_file), delete_icon=False)
         icon_v2 = Path(load_state()["artwork_app.desktop"]["icon_path"])
         self.assertTrue(icon_v1.exists(), "Kept artwork must remain available in icon storage")
@@ -753,7 +754,7 @@ class TestOverrides(unittest.TestCase):
 
         # 2. Replace with delete_icon=True: deletes icon_v2
         icon3_file = self.root / "art3.png"
-        icon3_file.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x77" * 64)
+        icon3_file.write_bytes(_valid_png_bytes("art3"))
         apply_icon("artwork_app.desktop", str(p), str(icon3_file), delete_icon=True)
         icon_v3 = Path(load_state()["artwork_app.desktop"]["icon_path"])
         self.assertFalse(icon_v2.exists(), "Deleted artwork must be removed")
@@ -818,7 +819,7 @@ class TestOverrides(unittest.TestCase):
         self.assertTrue(shared_icon.exists(), "Shared icon must not be deleted while still referenced by app 2")
 
         # Externally modify the icon file so its hash no longer matches
-        shared_icon.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\xff" * 64)
+        shared_icon.write_bytes(_valid_png_bytes("modified"))
         self.assertFalse(can_delete_managed_icon("app_share2.desktop"))
         eligible, _, reason = check_managed_icon_deletion("app_share2.desktop")
         self.assertFalse(eligible)
@@ -891,7 +892,7 @@ class TestOverrides(unittest.TestCase):
 
         # Force-apply a new icon
         icon2_file = self.root / "new_art.png"
-        icon2_file.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x99" * 64)
+        icon2_file.write_bytes(_valid_png_bytes("new_art"))
         apply_icon("rebase_app.desktop", str(p), str(icon2_file), force=True)
 
         state = load_state()["rebase_app.desktop"]
@@ -1198,7 +1199,7 @@ class TestOverrides(unittest.TestCase):
 
     def test_force_apply_and_revert_protect_saved_originals_when_active_override_unchanged(self):
         img2 = self.root / "img2.png"
-        img2.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x55" * 64)
+        img2.write_bytes(_valid_png_bytes("img2"))
 
         # 1. Force-apply icon when only unrelated key changed; delete_icon=True deletes old image; reset restores stock icon
         p1 = self.app_dir / "icon_force.desktop"

@@ -20,6 +20,14 @@ from glyph.appimage import (
 )
 
 
+def _valid_png_bytes(tag: str = "") -> bytes:
+    import base64
+    base = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+    )
+    return base + tag.encode("utf-8")
+
+
 class TestAppImageIntegration(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="glyph-appimage-test-")
@@ -203,7 +211,7 @@ class TestAppImageIntegration(unittest.TestCase):
     def test_unregister_detects_externally_modified_icon(self):
         source = self.create_fake_appimage("ModifiedIcon.AppImage")
         custom_icon = self.root / "custom.png"
-        custom_icon.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+        custom_icon.write_bytes(_valid_png_bytes("custom"))
 
         plan = plan_appimage_registration(source)
         desktop_id = register_appimage(plan, "Icon App", custom_icon_path=str(custom_icon))
@@ -384,7 +392,7 @@ class TestAppImageIntegration(unittest.TestCase):
     def test_register_appimage_stores_matching_icon_hash(self):
         source = self.create_fake_appimage("HashedIcon.AppImage")
         custom_icon = self.root / "icon.png"
-        icon_bytes = b"\x89PNG\r\n\x1a\n" + b"\x01" * 64
+        icon_bytes = _valid_png_bytes("hash")
         custom_icon.write_bytes(icon_bytes)
 
         plan = plan_appimage_registration(source)
@@ -399,7 +407,7 @@ class TestAppImageIntegration(unittest.TestCase):
     def test_unregister_preserves_icon_with_missing_expected_hash(self):
         source = self.create_fake_appimage("NoHashIcon.AppImage")
         custom_icon = self.root / "nohash.png"
-        custom_icon.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x02" * 64)
+        custom_icon.write_bytes(_valid_png_bytes("nohash"))
 
         plan = plan_appimage_registration(source)
         desktop_id = register_appimage(plan, "No Hash App", custom_icon_path=str(custom_icon))
@@ -453,7 +461,7 @@ class TestAppImageIntegration(unittest.TestCase):
     def test_unregister_removes_unmodified_matching_icon(self):
         source = self.create_fake_appimage("MatchingIcon.AppImage")
         custom_icon = self.root / "matching.png"
-        custom_icon.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x03" * 64)
+        custom_icon.write_bytes(_valid_png_bytes("matching"))
 
         plan = plan_appimage_registration(source)
         desktop_id = register_appimage(plan, "Matching App", custom_icon_path=str(custom_icon))
@@ -490,7 +498,7 @@ class TestAppImageIntegration(unittest.TestCase):
 
         launcher_path = self.desktop_apps / desktop_id
         icon_v1 = self.root / "icon_v1.png"
-        v1_bytes = b"\x89PNG\r\n\x1a\n" + b"\x10" * 64
+        v1_bytes = _valid_png_bytes("v1")
         icon_v1.write_bytes(v1_bytes)
 
         overrides.apply_icon(desktop_id, str(launcher_path), str(icon_v1))
@@ -501,7 +509,7 @@ class TestAppImageIntegration(unittest.TestCase):
 
         # Replace with icon_v2
         icon_v2 = self.root / "icon_v2.png"
-        v2_bytes = b"\x89PNG\r\n\x1a\n" + b"\x20" * 64
+        v2_bytes = _valid_png_bytes("v2")
         icon_v2.write_bytes(v2_bytes)
 
         overrides.apply_icon(desktop_id, str(launcher_path), str(icon_v2))
@@ -600,7 +608,7 @@ class TestAppImageIntegration(unittest.TestCase):
     def test_unregister_with_keep_artwork_preserves_icon(self):
         source = self.create_fake_appimage("KeepIcon.AppImage")
         custom_icon = self.root / "keep.png"
-        custom_icon.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x55" * 64)
+        custom_icon.write_bytes(_valid_png_bytes("keep"))
 
         plan = plan_appimage_registration(source)
         desktop_id = register_appimage(plan, "Keep Icon App", custom_icon_path=str(custom_icon))
@@ -622,7 +630,7 @@ class TestAppImageIntegration(unittest.TestCase):
     def test_unregister_with_delete_artwork_reports_deleted_when_unshared(self):
         source = self.create_fake_appimage("DelIcon.AppImage")
         custom_icon = self.root / "del.png"
-        custom_icon.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x66" * 64)
+        custom_icon.write_bytes(_valid_png_bytes("del"))
 
         plan = plan_appimage_registration(source)
         desktop_id = register_appimage(plan, "Del Icon App", custom_icon_path=str(custom_icon))
@@ -636,7 +644,7 @@ class TestAppImageIntegration(unittest.TestCase):
     def test_unregister_reports_skipped_for_shared_and_modified_artwork(self):
         source1 = self.create_fake_appimage("Shared1.AppImage")
         custom_icon = self.root / "shared.png"
-        custom_icon.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x77" * 64)
+        custom_icon.write_bytes(_valid_png_bytes("shared"))
 
         plan1 = plan_appimage_registration(source1)
         id1 = register_appimage(plan1, "Shared App 1", custom_icon_path=str(custom_icon))
@@ -670,7 +678,7 @@ class TestAppImageIntegration(unittest.TestCase):
         icon_path2 = Path(state[id2]["icon_path"])
 
         # Modify icon file externally
-        icon_path2.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x88" * 64)
+        icon_path2.write_bytes(_valid_png_bytes("mod2"))
         res_mod = unregister_appimage(id2, delete_icon=True)
         self.assertTrue(res_mod.get("icon_skipped"))
         self.assertEqual(res_mod.get("icon_skip_reason"), "modified")

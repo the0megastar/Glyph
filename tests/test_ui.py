@@ -814,8 +814,17 @@ class TestUI(unittest.TestCase):
     def test_show_icon_picker_with_themes_presents_dialog(self):
         themes = [SimpleNamespace(theme_id="test-theme", name="Test Theme", comment="", inherits=(), path="/path", hidden=False)]
         with patch("glyph.dialogs.list_installed_themes", return_value=themes), \
-             patch("glyph.dialogs.search_theme_icons", return_value=[]):
+             patch("glyph.dialogs.search_theme_icons", return_value=[]), \
+             patch("glyph.dialogs.Adw.Window") as mock_window, \
+             patch("glyph.dialogs.Adw.ToolbarView"), \
+             patch("glyph.dialogs.Adw.HeaderBar"), \
+             patch("glyph.dialogs.Gtk") as mock_gtk:
+            mock_gtk.DropDown.new.return_value.get_selected.return_value = 0
+            mock_gtk.SearchEntry.return_value.get_text.return_value = ""
+            mock_gtk.FlowBox.return_value.get_first_child.return_value = None
             dialogs.show_icon_picker(None, SimpleNamespace(name="Test", desktop_id="test.desktop"))
+            mock_window.assert_called_once()
+            mock_window.return_value.present.assert_called_once()
 
 
 if __name__ == "__main__":
