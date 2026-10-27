@@ -45,9 +45,9 @@
   </screenshots>
 
   <releases>
-    <release version="0.1.5" date="2026-10-13">
+    <release version="0.1.5" date="2026-10-26">
       <description>
-        <p>Package classification, icon-theme browser, launch adapter, command editor, and AppImage lifecycle:</p>
+        <p>Package classification, icon-theme browser, launch adapter, command editor, AppImage lifecycle, and baseline safety:</p>
         <ul>
           <li>Browse and apply icons directly from installed icon themes with choices for theme-following or fixed artwork</li>
           <li>Accurate package classification and version provenance for RPM, Flatpak, DEB, Pacman, Snap, and AppImage</li>
@@ -55,6 +55,8 @@
           <li>Customize application launch commands at the user level with full support for restoring original commands</li>
           <li>Discover AppImages in ~/Applications and safely register external AppImages with non-destructive copying</li>
           <li>Unregister managed AppImage launchers cleanly while preserving underlying binary files</li>
+          <li>Prompted cleanup of managed artwork on icon reversion and AppImage unregistration with safeguards for shared icons</li>
+          <li>External launcher conflict detection and baseline rebasing to protect user customizations from being overwritten</li>
           <li>Informational, source-aware install and update guidance for detected application sources</li>
           <li>Fixed AppImage packaging: corrected icon resolution staging, launcher execution, and explicit self-registration</li>
         </ul>

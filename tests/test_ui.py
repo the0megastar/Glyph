@@ -805,6 +805,19 @@ class TestUI(unittest.TestCase):
             self.assertEqual(toasts[-1], "Discarded overrides for Discard App.")
 
 
+    def test_show_icon_picker_no_themes_falls_back_to_file_dialog(self):
+        cb = MagicMock()
+        with patch("glyph.dialogs.list_installed_themes", return_value=[]):
+            dialogs.show_icon_picker(None, SimpleNamespace(name="Test"), on_open_file_callback=cb)
+        cb.assert_called_once()
+
+    def test_show_icon_picker_with_themes_presents_dialog(self):
+        themes = [SimpleNamespace(theme_id="test-theme", name="Test Theme", comment="", inherits=(), path="/path", hidden=False)]
+        with patch("glyph.dialogs.list_installed_themes", return_value=themes), \
+             patch("glyph.dialogs.search_theme_icons", return_value=[]):
+            dialogs.show_icon_picker(None, SimpleNamespace(name="Test", desktop_id="test.desktop"))
+
+
 if __name__ == "__main__":
     unittest.main()
 
